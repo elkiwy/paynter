@@ -6,12 +6,34 @@ import random
 def rand(a,b):
 	return random.randint(a,b) #inclusive
 
+def loadBrushTip(path, size):
+	#Open the image and make sure its RGB
+	res = Image.open(path).convert('RGB')
+	
+	#Resize it to the target size
+	factor = (size/res.width)
+	resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
+	
+	#Invert and grab the value
+	resScaled = PIL.ImageOps.invert(resScaled)
+	grayscaleValue = resScaled.split()[0]
+
+	#Create the brushtip image
+	bt = N.zeros((size,size, 4), dtype=N.float32)
+	bt[:,:,0] = 1
+	bt[:,:,1] = 1
+	bt[:,:,2] = 1		
+	bt[:,:,3] = N.divide(N.array(grayscaleValue), 255)
+	return bt
 
 
 '''
 TODO:
--Support BW brush tips and not alpha tip
 -Do a proper wrapping around brush textures
+-Add spacing to brushes
+-Add randomization parameters for waterolours
+-reimplement rotation on the dab step
+
 
 
 '''
@@ -60,31 +82,12 @@ class Brush:
 			#Multibrush
 			self.brushTip = []
 			for image in tipImage:
-				res = Image.open(image)
-				res = res.rotate(angle, expand=1)
-				factor = (size/res.width)
-				resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
-				alpha = resScaled.split()[-1]
-				bt = N.zeros((size,size, 4), dtype=N.float32)
-				bt[:,:,0] = 1
-				bt[:,:,1] = 1
-				bt[:,:,2] = 1		
-				bt[:,:,3] = N.divide(N.array(alpha), 255)
+				bt = loadBrushTip(image, size)
 				self.brushTip.append(bt)
 			self.multibrush = True
 		else:
 			#NormalBrush
-			res = Image.open(tipImage)
-			res = res.rotate(angle, expand=1)
-			factor = (size/res.width)
-			resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
-			alpha = resScaled.split()[-1]
-			bt = N.zeros((size,size, 4), dtype=N.float32)
-			bt[:,:,0] = 1
-			bt[:,:,1] = 1
-			bt[:,:,2] = 1		
-			bt[:,:,3] = N.divide(N.array(alpha), 255)
-			self.brushTip = bt
+			self.brushTip = loadBrushTip(tipImage, size)
 
 		
 		#Set the perameters
@@ -93,13 +96,20 @@ class Brush:
 
 		#Set the brush mask
 		self.maskSize = 2048
-		res = Image.open("paperGrain2048.png")
-		factor = (self.maskSize/res.width)
-		resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
-		alpha = resScaled.split()[0] #Take only the red channel since is black and white
-		bm = N.zeros((self.maskSize,self.maskSize), dtype=N.float32)
-		bm[:,:] = N.divide(N.array(alpha), 255)*5
-		self.brushMask = 1-bm
+		if maskImage!="":
+			res = Image.open(maskImage)
+			factor = (self.maskSize/res.width)
+			resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
+			alpha = resScaled.split()[0] #Take only the red channel since is black and white
+			bm = N.zeros((self.maskSize,self.maskSize), dtype=N.float32)
+			bm[:,:] = N.divide(N.array(alpha), 255)*5
+			self.brushMask = 1-bm
+		else:
+			#Add default mask
+			bm = N.zeros((self.maskSize,self.maskSize), dtype=N.float32)
+			bm[:,:] = 0
+			self.brushMask = 1-bm
+			
 
 
 
