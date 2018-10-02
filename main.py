@@ -1,5 +1,5 @@
 import numpy as N
-from functions import *
+from paynter import *
 from PIL import Image
 
 import time

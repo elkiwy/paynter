@@ -67,7 +67,6 @@ class Paynter:
 	def drawLine(self, x1, y1, x2, y2):
 		#Calculate the direction and the length of the step
 		direction = math.atan2(y2 - y1, x2 - x1)
-		print('direction:'+str(direction))
 		length = self.brush.spacing
 
 		#Prepare the loop
@@ -85,7 +84,6 @@ class Paynter:
 			y += length*dsin(direction)
 			previousDist = currentDist
 			currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
-			print(currentDist)
 			
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, r, g, b, a=255):
