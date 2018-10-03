@@ -8,11 +8,8 @@ import config
 
 '''
 TODO:
--Do a proper wrapping around brush textures
--Add spacing to brushes
 -Add randomization parameters for waterolours
 -reimplement rotation on the dab step
--Check for dab outside the layer
 
 
 '''
@@ -22,6 +19,10 @@ TODO:
 ######################################################################
 # Useful Functions
 ######################################################################
+
+#Clamp shortcut
+def clamp(x, mi, ma):
+	return max(mi, min(ma, x))
 
 #Random shortcut
 def rand(a,b):
@@ -68,7 +69,7 @@ class Paynter:
 
 	def drawLine(self, x1, y1, x2, y2):
 		#Calculate the direction and the length of the step
-		direction = math.atan2(y2 - y1, x2 - x1)
+		direction = math.degrees(math.atan2(y2 - y1, x2 - x1))
 		length = self.brush.spacing
 
 		#Prepare the loop
@@ -146,26 +147,41 @@ class Brush:
 
 
 	def makeDab(self, layer, x, y, color):
+		#Adjust coordinates and make sure we are inside (at least partially) the canvas
+		adj_x1, adj_y1 = clamp(x, 0, config.CANVAS_SIZE), clamp(y, 0, config.CANVAS_SIZE)
+		adj_x2, adj_y2 = clamp(x+self.brushSize, 0, config.CANVAS_SIZE), clamp(y+self.brushSize, 0, config.CANVAS_SIZE)
+		if adj_x1==adj_x2 or adj_y1==adj_y2:
+			return
+
 		#Get the slice and uniform to [0-1]
-		destination = layer[y:y+self.brushSize, x:x+self.brushSize].astype(N.float32)
+		destination = layer[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)
 		destination /= 255
 
-		#Calculate Source image 
+		#Get the brush image image 
 		brushSource = 0
 		if self.multibrush:
 			brushSource = self.brushTip[rand(0,len(self.brushTip)-1)]
 		else:
 			brushSource = self.brushTip
-		source = brushSource[:,:] * color
-		source[:,:,3] *= self.brushMask[y:y+self.brushSize, x:x+self.brushSize]
 		
+		#Calculate the correct range to make sure it works even on canvas border 
+		bx1 = max(0, self.brushSize - adj_x2)
+		bx2 = min(self.brushSize, config.CANVAS_SIZE - adj_x1)
+		by1 = max(0, self.brushSize - adj_y2)
+		by2 = min(self.brushSize, config.CANVAS_SIZE - adj_y1)
+
+		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
+		source = brushSource[:,:] * color
+		source = source[by1:by2, bx1:bx2, :]
+		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
+
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
-		final = N.zeros((self.brushSize,self.brushSize, 4), dtype=N.float32)
+		final = N.zeros((adj_y2-adj_y1, adj_x2-adj_x1, 4), dtype=N.float32)
 		final[:,:,0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255
 		final[:,:,1] = ((destination[:,:,1] * (1-source[:,:,3])) + (source[:,:,1] * (source[:,:,3])))*255
 		final[:,:,2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255		
 		final[:,:,3] = ((destination[:,:,3] * (1-source[:,:,3])) + (source[:,:,3] * (source[:,:,3])))*255
-		layer[y:y+self.brushSize,x:x+self.brushSize] = final.astype(N.uint8)
+		layer[adj_y1:adj_y2, adj_x1:adj_x2] = final.astype(N.uint8)
 
 
 

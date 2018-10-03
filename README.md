@@ -12,6 +12,7 @@ This is a list with what there is currently inside the code:
 	- Supports for multiple brush tips (randomized each dab)
 	- Rotated brush tip
 	- Brush spacing
+	- Custom Brush textures
 
 - PaYnter functions:
 	- DrawLine
