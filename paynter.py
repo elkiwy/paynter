@@ -4,6 +4,8 @@ import PIL.ImageOps
 import random
 import math
 
+import config
+
 '''
 TODO:
 -Do a proper wrapping around brush textures
@@ -103,7 +105,6 @@ class Brush:
 	brushTip = 0
 	brushMask = 0
 	brushSize = 0
-	maskSize = 0
 	multibrush = False
 	spacing = 0
 
@@ -126,18 +127,18 @@ class Brush:
 		self.spacing = size*spacing
 
 		#Set the brush mask
-		self.maskSize = 2048
 		if maskImage!="":
 			res = Image.open(maskImage)
-			factor = (self.maskSize/res.width)
-			resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
-			alpha = resScaled.split()[0] #Take only the red channel since is black and white
-			bm = N.zeros((self.maskSize,self.maskSize), dtype=N.float32)
-			bm[:,:] = N.divide(N.array(alpha), 255)*5
+			alpha = res.split()[0] #Take only the red channel since is black and white
+			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
+			for j in range(0, config.CANVAS_SIZE, res.width):
+				for i in range(0, config.CANVAS_SIZE, res.width):
+					bm[i:i+res.width, j:j+res.width] = N.divide(N.array(alpha), 255)*5
 			self.brushMask = 1-bm
+		
 		else:
 			#Add default mask
-			bm = N.zeros((self.maskSize,self.maskSize), dtype=N.float32)
+			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			bm[:,:] = 0
 			self.brushMask = 1-bm
 			
