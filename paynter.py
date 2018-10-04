@@ -36,8 +36,12 @@ def dcos(deg):
 def dsin(deg):
 	return math.sin(math.radians(deg))
 
+#Get fuzzy
+def fuzzy(fuzzyRange):
+	return rand(fuzzyRange[0], fuzzyRange[1])
+
 #Image to brushtip function
-def loadBrushTip(path, size):
+def loadBrushTip(path, size, angle):
 	#Open the image and make sure its RGB
 	res = Image.open(path).convert('RGB')
 	
@@ -47,10 +51,11 @@ def loadBrushTip(path, size):
 	
 	#Invert and grab the value
 	resScaled = PIL.ImageOps.invert(resScaled)
+	resScaled = resScaled.rotate(angle, expand = 1)
 	grayscaleValue = resScaled.split()[0]
 
 	#Create the brushtip image
-	bt = N.zeros((size,size, 4), dtype=N.float32)
+	bt = N.zeros((resScaled.width, resScaled.height, 4), dtype=N.float32)
 	bt[:,:,0] = 1
 	bt[:,:,1] = 1
 	bt[:,:,2] = 1		
@@ -108,24 +113,29 @@ class Brush:
 	brushSize = 0
 	multibrush = False
 	spacing = 0
+	fuzzyDabAngle = 0
+	fuzzyDabSize = 0
 
 	def __init__(self, tipImage, maskImage, size = 50, 
-				color = [0,0,0,0], angle = 0, spacing = 1):
+				color = [0,0,0,0], angle = 0, spacing = 1, fuzzyDabAngle = 0, fuzzyDabSize = 0):
 		#Set the brushTip
 		if isinstance(tipImage, list):
 			#Multibrush
 			self.brushTip = []
 			for image in tipImage:
-				bt = loadBrushTip(image, size)
+				bt = loadBrushTip(image, size, angle)
 				self.brushTip.append(bt)
 			self.multibrush = True
+			self.brushSize = self.brushTip[0].shape[0]
 		else:
 			#NormalBrush
-			self.brushTip = loadBrushTip(tipImage, size)
+			self.brushTip = loadBrushTip(tipImage, size, angle)
+			self.brushSize = self.brushTip.shape[0]
 		
 		#Set the perameters
-		self.brushSize = size
 		self.spacing = size*spacing
+		self.fuzzyDabAngle = fuzzyDabAngle
+		self.fuzzyDabSize = fuzzyDabSize
 
 		#Set the brush mask
 		if maskImage!="":
@@ -147,15 +157,9 @@ class Brush:
 
 
 	def makeDab(self, layer, x, y, color):
-		#Adjust coordinates and make sure we are inside (at least partially) the canvas
-		adj_x1, adj_y1 = clamp(x, 0, config.CANVAS_SIZE), clamp(y, 0, config.CANVAS_SIZE)
-		adj_x2, adj_y2 = clamp(x+self.brushSize, 0, config.CANVAS_SIZE), clamp(y+self.brushSize, 0, config.CANVAS_SIZE)
-		if adj_x1==adj_x2 or adj_y1==adj_y2:
-			return
+		#brushTip = RGBA float32
+		#
 
-		#Get the slice and uniform to [0-1]
-		destination = layer[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)
-		destination /= 255
 
 		#Get the brush image image 
 		brushSource = 0
@@ -163,17 +167,55 @@ class Brush:
 			brushSource = self.brushTip[rand(0,len(self.brushTip)-1)]
 		else:
 			brushSource = self.brushTip
-		
+
+		#Apply fuzzy angle
+		#if self.fuzzyDabSize!=0:
+		#	img = Image.fromarray(brushSource, 'RGBA')
+		#	img = img.rotate(fuzzy(self.fuzzyDabSize), expand = 1)
+		#	brushSource = N.array(img)
+
+		#Apply fuzzy scale
+		if self.fuzzyDabSize!=0:
+			adaptedArray = brushSource*255
+			img = Image.fromarray(adaptedArray.astype(N.uint8), 'RGBA')
+			fuz = fuzzy(self.fuzzyDabSize)
+			img = img.resize((int(img.width*fuz), int(img.height*fuz)))
+			grayscaleValue = img.split()[0]
+			brushSource = N.zeros((img.width, img.height, 4), dtype=N.float32)
+			brushSource[:,:,0] = 1
+			brushSource[:,:,1] = 1
+			brushSource[:,:,2] = 1		
+			brushSource[:,:,3] = N.divide(N.array(grayscaleValue), 255)
+
+		#Get the final dab size
+		dabSizeX = brushSource.shape[0]
+		dabSizeY = brushSource.shape[1]
+
+		#Adjust coordinates and make sure we are inside (at least partially) the canvas
+		adj_x1, adj_y1 = clamp(x, 0, config.CANVAS_SIZE), clamp(y, 0, config.CANVAS_SIZE)
+		adj_x2, adj_y2 = clamp(x+dabSizeX, 0, config.CANVAS_SIZE), clamp(y+dabSizeY, 0, config.CANVAS_SIZE)
+		if adj_x1==adj_x2 or adj_y1==adj_y2:
+			return
+
+		#Get the slice and uniform to [0-1]
+		destination = layer[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)
+		destination /= 255
+
 		#Calculate the correct range to make sure it works even on canvas border 
-		bx1 = max(0, self.brushSize - adj_x2)
-		bx2 = min(self.brushSize, config.CANVAS_SIZE - adj_x1)
-		by1 = max(0, self.brushSize - adj_y2)
-		by2 = min(self.brushSize, config.CANVAS_SIZE - adj_y1)
+		bx1 = max(0, dabSizeX - adj_x2)
+		bx2 = min(dabSizeX, config.CANVAS_SIZE - adj_x1)
+		by1 = max(0, dabSizeY - adj_y2)
+		by2 = min(dabSizeY, config.CANVAS_SIZE - adj_y1)
 
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
 		source = brushSource[:,:] * color
 		source = source[by1:by2, bx1:bx2, :]
+		print('source:'+str(source[:, :, 3].shape))
+		print('mask:'+str(self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2].shape))
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
+
+
+
 
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
 		final = N.zeros((adj_y2-adj_y1, adj_x2-adj_x1, 4), dtype=N.float32)
