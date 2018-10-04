@@ -35,7 +35,7 @@ watercolor = Brush(
 	angle=0,
 	spacing = 0.75,
 	fuzzyDabAngle = [0, 360],
-	fuzzyDabSize = [1, 2])
+	fuzzyDabSize = [1, 3])
 
 #Create the first layer 
 data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
@@ -56,11 +56,11 @@ paynter.setBrush(pencil)
 
 paynter.setBrush(watercolor)
 paynter.setColor(255, 0, 0, 255)
-paynter.drawLine(1000, 1000, 1100, 1100)
+paynter.drawLine(100, 1000, 1100, 1100)
 paynter.setColor(0, 255, 0, 255)
-paynter.drawLine(1000, 1000, 1100, 1100)
+paynter.drawLine(100, 100, 1100, 1100)
 paynter.setColor(0, 0, 255, 255)
-paynter.drawLine(1000, 1000, 1100, 1100)
+paynter.drawLine(100, 100, 1100, 1100)
 
 #Make sure the alpha on the base layer is ok
 data[:,:,3] = 255

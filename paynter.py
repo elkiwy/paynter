@@ -9,8 +9,8 @@ import config
 '''
 TODO:
 -Add randomization parameters for waterolours
--reimplement rotation on the dab step
-
+-Add mix hue sat val fuzzy to brushdabs
+-add mirror fuzzy 
 
 '''
 
@@ -25,8 +25,12 @@ def clamp(x, mi, ma):
 	return max(mi, min(ma, x))
 
 #Random shortcut
-def rand(a,b):
+def randInt(a,b):
 	return random.randint(a,b) #inclusive
+
+#Random shortcut
+def randFloat(a,b):
+	return random.uniform(a,b)
 
 #Degree cosine shortcut
 def dcos(deg):
@@ -38,7 +42,7 @@ def dsin(deg):
 
 #Get fuzzy
 def fuzzy(fuzzyRange):
-	return rand(fuzzyRange[0], fuzzyRange[1])
+	return randFloat(fuzzyRange[0], fuzzyRange[1])
 
 #Image to brushtip function
 def loadBrushTip(path, size, angle):
@@ -54,12 +58,21 @@ def loadBrushTip(path, size, angle):
 	resScaled = resScaled.rotate(angle, expand = 1)
 	grayscaleValue = resScaled.split()[0]
 
+	'''
+	resScaled = B/W Image with black background and white stamp 0-255 values
+	'''
+
 	#Create the brushtip image
 	bt = N.zeros((resScaled.width, resScaled.height, 4), dtype=N.float32)
 	bt[:,:,0] = 1
 	bt[:,:,1] = 1
 	bt[:,:,2] = 1		
 	bt[:,:,3] = N.divide(N.array(grayscaleValue), 255)
+
+	'''
+	bt = 3D array full white and alpha 0-1 values
+	'''
+
 	return bt
 
 
@@ -157,35 +170,30 @@ class Brush:
 
 
 	def makeDab(self, layer, x, y, color):
-		#brushTip = RGBA float32
-		#
-
-
 		#Get the brush image image 
 		brushSource = 0
 		if self.multibrush:
-			brushSource = self.brushTip[rand(0,len(self.brushTip)-1)]
+			brushSource = self.brushTip[randInt(0,len(self.brushTip)-1)]
 		else:
 			brushSource = self.brushTip
 
-		#Apply fuzzy angle
-		#if self.fuzzyDabSize!=0:
-		#	img = Image.fromarray(brushSource, 'RGBA')
-		#	img = img.rotate(fuzzy(self.fuzzyDabSize), expand = 1)
-		#	brushSource = N.array(img)
+		#Apply transformations
+		if self.fuzzyDabAngle!=0 or self.fuzzyDabSize!=0:
+			#Convert the brush to an image to ease out the rotation and resizing process
+			img = Image.fromarray((brushSource*255).astype(N.uint8), 'RGBA')
+			
+			#Apply fuzzy scale
+			if self.fuzzyDabAngle!=0:
+				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1)
+				brushSource = N.array(img)/255
 
-		#Apply fuzzy scale
-		if self.fuzzyDabSize!=0:
-			adaptedArray = brushSource*255
-			img = Image.fromarray(adaptedArray.astype(N.uint8), 'RGBA')
-			fuz = fuzzy(self.fuzzyDabSize)
-			img = img.resize((int(img.width*fuz), int(img.height*fuz)))
-			grayscaleValue = img.split()[0]
-			brushSource = N.zeros((img.width, img.height, 4), dtype=N.float32)
-			brushSource[:,:,0] = 1
-			brushSource[:,:,1] = 1
-			brushSource[:,:,2] = 1		
-			brushSource[:,:,3] = N.divide(N.array(grayscaleValue), 255)
+			#Apply fuzzy scale
+			if self.fuzzyDabSize!=0:
+				fuz = fuzzy(self.fuzzyDabSize)
+				img = img.resize((int(img.width*fuz), int(img.height*fuz)))
+			
+			#Reconvert brushSource to an array
+			brushSource = N.array(img)/255
 
 		#Get the final dab size
 		dabSizeX = brushSource.shape[0]
@@ -202,16 +210,15 @@ class Brush:
 		destination /= 255
 
 		#Calculate the correct range to make sure it works even on canvas border 
-		bx1 = max(0, dabSizeX - adj_x2)
-		bx2 = min(dabSizeX, config.CANVAS_SIZE - adj_x1)
-		by1 = max(0, dabSizeY - adj_y2)
-		by2 = min(dabSizeY, config.CANVAS_SIZE - adj_y1)
+		bx1 = 0 if (x>=0) else dabSizeX-adj_x2
+		bx2 = x+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
+		by1 = 0 if (y>=0) else dabSizeY-adj_y2
+		by2 = y+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
 
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
 		source = brushSource[:,:] * color
 		source = source[by1:by2, bx1:bx2, :]
-		print('source:'+str(source[:, :, 3].shape))
-		print('mask:'+str(self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2].shape))
+		
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
 
 
