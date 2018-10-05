@@ -3,6 +3,7 @@ import PIL.Image
 import PIL.ImageOps
 import random
 import math
+import colorsys
 
 import config
 
@@ -21,6 +22,18 @@ TODO:
 ######################################################################
 # Useful Functions
 ######################################################################
+
+
+
+
+
+#Take 0-1 hsv and outputs a 0-1 rgb
+def hsv2rgb(hsv):
+    return N.asarray(colorsys.hsv_to_rgb(hsv[0],hsv[1],hsv[2]))
+
+#Take 0-1 rgb and outputs 0-1 hsv
+def rgb2hsv(rgb):
+    return N.asarray(colorsys.rgb_to_hsv(rgb[0],rgb[1],rgb[2]))
 
 #Clamp shortcut
 def clamp(x, mi, ma):
@@ -130,9 +143,11 @@ class Brush:
 	spacing = 0
 	fuzzyDabAngle = 0
 	fuzzyDabSize = 0
+	fuzzyDabHue = 0
+	fuzzyDabSat = 0
 
 	def __init__(self, tipImage, maskImage, size = 50, 
-				color = [0,0,0,0], angle = 0, spacing = 1, fuzzyDabAngle = 0, fuzzyDabSize = 0):
+				color = [0,0,0,0], angle = 0, spacing = 1, fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0):
 		#Set the brushTip
 		if isinstance(tipImage, list):
 			#Multibrush
@@ -151,6 +166,8 @@ class Brush:
 		self.spacing = size*spacing
 		self.fuzzyDabAngle = fuzzyDabAngle
 		self.fuzzyDabSize = fuzzyDabSize
+		self.fuzzyDabHue = fuzzyDabHue
+		self.fuzzyDabSat = fuzzyDabSat
 
 		#Set the brush mask
 		if maskImage!="":
@@ -197,6 +214,33 @@ class Brush:
 			#Reconvert brushSource to an array
 			brushSource = N.array(img)/255
 
+
+
+
+
+
+		#Apply fuzzy color transformations
+		dabColor = N.copy(color)
+		if self.fuzzyDabHue!=0 or self.fuzzyDabSat!=0:
+			#Convert to hsv
+			hsv = rgb2hsv(dabColor[:3])
+
+			#Fuzzy Hue
+			if self.fuzzyDabHue!=0:
+				hsv[0] = (hsv[0] + fuzzy(self.fuzzyDabHue)) % 1
+			#Fuzzy Saturation
+			if self.fuzzyDabSat!=0:
+				hsv[1] = clamp(hsv[1] + fuzzy(self.fuzzyDabSat), 0, 1)
+
+			#Convert back to rgb
+			dabColor[:3] = hsv2rgb(hsv)
+
+
+
+
+
+
+
 		#Get the final dab size
 		dabSizeX = brushSource.shape[0]
 		dabSizeY = brushSource.shape[1]
@@ -218,7 +262,7 @@ class Brush:
 		by2 = y+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
 
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
-		source = brushSource[:,:] * color
+		source = brushSource[:,:] * dabColor
 		source = source[by1:by2, bx1:bx2, :]
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
 
@@ -229,7 +273,6 @@ class Brush:
 		final[:,:,2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255		
 		final[:,:,3] = ((destination[:,:,3] * (1-source[:,:,3])) + (source[:,:,3] * (source[:,:,3])))*255
 		layer[adj_y1:adj_y2, adj_x1:adj_x2] = final.astype(N.uint8)
-
 
 
 
