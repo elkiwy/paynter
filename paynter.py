@@ -1,5 +1,5 @@
 import numpy as N
-from PIL import Image
+import PIL.Image
 import PIL.ImageOps
 import random
 import math
@@ -11,6 +11,8 @@ TODO:
 -Add randomization parameters for waterolours
 -Add mix hue sat val fuzzy to brushdabs
 -add mirror fuzzy 
+
+-fix lines out of the canvas (pencil)
 
 '''
 
@@ -47,7 +49,7 @@ def fuzzy(fuzzyRange):
 #Image to brushtip function
 def loadBrushTip(path, size, angle):
 	#Open the image and make sure its RGB
-	res = Image.open(path).convert('RGB')
+	res = PIL.Image.open(path).convert('RGB')
 	
 	#Resize it to the target size
 	factor = (size/res.width)
@@ -152,7 +154,7 @@ class Brush:
 
 		#Set the brush mask
 		if maskImage!="":
-			res = Image.open(maskImage)
+			res = PIL.Image.open(maskImage)
 			alpha = res.split()[0] #Take only the red channel since is black and white
 			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			for j in range(0, config.CANVAS_SIZE, res.width):
@@ -180,17 +182,17 @@ class Brush:
 		#Apply transformations
 		if self.fuzzyDabAngle!=0 or self.fuzzyDabSize!=0:
 			#Convert the brush to an image to ease out the rotation and resizing process
-			img = Image.fromarray((brushSource*255).astype(N.uint8), 'RGBA')
+			img = PIL.Image.fromarray((brushSource*255).astype(N.uint8), 'RGBA')
 			
 			#Apply fuzzy scale
 			if self.fuzzyDabAngle!=0:
-				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1)
+				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1, resample=PIL.Image.BICUBIC)
 				brushSource = N.array(img)/255
 
 			#Apply fuzzy scale
 			if self.fuzzyDabSize!=0:
 				fuz = fuzzy(self.fuzzyDabSize)
-				img = img.resize((int(img.width*fuz), int(img.height*fuz)))
+				img = img.resize((int(img.width*fuz), int(img.height*fuz)), resample=PIL.Image.LANCZOS)
 			
 			#Reconvert brushSource to an array
 			brushSource = N.array(img)/255
@@ -218,11 +220,7 @@ class Brush:
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
 		source = brushSource[:,:] * color
 		source = source[by1:by2, bx1:bx2, :]
-		
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
-
-
-
 
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
 		final = N.zeros((adj_y2-adj_y1, adj_x2-adj_x1, 4), dtype=N.float32)

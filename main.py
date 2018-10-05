@@ -9,8 +9,6 @@ import config
 #Python base libs
 import time
 
-
-
 #Start the timer for banchmarks
 start = time.time()
 
