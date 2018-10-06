@@ -21,10 +21,6 @@ TODO:
 # Useful Functions
 ######################################################################
 
-
-
-
-
 #Take 0-1 hsv and outputs a 0-1 rgb
 def hsv2rgb(hsv):
     return N.asarray(colorsys.hsv_to_rgb(hsv[0],hsv[1],hsv[2]))
@@ -63,17 +59,12 @@ def loadBrushTip(path, size, angle):
 	res = PIL.Image.open(path).convert('RGB')
 	
 	#Resize it to the target size
-	factor = (size/res.width)
-	resScaled = res.resize((int(res.width * factor), int(res.height * factor)))
+	resScaled = res.resize((size, size), resample=PIL.Image.LANCZOS)
 	
 	#Invert and grab the value
 	resScaled = PIL.ImageOps.invert(resScaled)
 	resScaled = resScaled.rotate(angle, expand = 1)
 	grayscaleValue = resScaled.split()[0]
-
-	'''
-	resScaled = B/W Image with black background and white stamp 0-255 values
-	'''
 
 	#Create the brushtip image
 	bt = N.zeros((resScaled.width, resScaled.height, 4), dtype=N.float32)
@@ -82,11 +73,83 @@ def loadBrushTip(path, size, angle):
 	bt[:,:,2] = 1		
 	bt[:,:,3] = N.divide(N.array(grayscaleValue), 255)
 
-	'''
-	bt = 3D array full white and alpha 0-1 values
-	'''
-
+	#Return this 3D array full white and alpha 0-1 values
 	return bt
+
+
+######################################################################
+# Color Management functions
+######################################################################
+#Get 3 colors with a triad pattern
+def getColors_Triad(sat = 1, val = 1, spread = 60):
+	palette = list()
+	leadHue = randFloat(0, 1)
+
+	#First color
+	hsv = [	leadHue, sat, val]
+	rgb = hsv2rgb(hsv)*255
+	rgba = [rgb[0], rgb[1], rgb[2], 255]
+	palette.append(rgba)
+
+	#Second color
+	hsv = [	(leadHue + 0.5 + spread/360) % 1, sat, val]
+	rgb = hsv2rgb(hsv)*255
+	rgba = [rgb[0], rgb[1], rgb[2], 255]
+	palette.append(rgba)
+
+	#Third
+	hsv = [	(leadHue + 0.5 - spread/360) % 1, sat, val]
+	rgb = hsv2rgb(hsv)*255
+	rgba = [rgb[0], rgb[1], rgb[2], 255]
+	palette.append(rgba)
+
+	return palette 
+
+#Change the hue of a color
+def tweakColorHue(rgba, ammount):
+	hsv = rgb2hsv(N.asarray(rgba[:3])/255)
+	hsv[0] = (hsv[0] + ammount) % 1
+	rgba[:3] = hsv2rgb(hsv)
+	rgba[0] *= 255
+	rgba[1] *= 255
+	rgba[2] *= 255
+	return rgba
+
+#Change the saturation of a color
+def tweakColorSat(rgba, ammount):
+	hsv = rgb2hsv(N.asarray(rgba[:3])/255)
+	hsv[1] = clamp(hsv[1] + ammount, 0, 1)
+	rgba[:3] = hsv2rgb(hsv)
+	rgba[0] *= 255
+	rgba[1] *= 255
+	rgba[2] *= 255
+	return rgba
+
+#Change the value of a color
+def tweakColorVal(rgba, ammount):
+	print(rgba)
+	hsv = rgb2hsv(N.asarray(rgba[:3])/255)
+	hsv[2] = clamp(hsv[2] + ammount, 0, 1)
+	rgba[:3] = hsv2rgb(hsv)
+	rgba[0] *= 255
+	rgba[1] *= 255
+	rgba[2] *= 255
+	return rgba
+
+
+
+######################################################################
+# Layer Functions
+######################################################################
+
+#Create a new layer
+def newLayer(color = [255,255,255,255]):
+	data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
+	data[:,:,0] = color[0]
+	data[:,:,1] = color[1]
+	data[:,:,2] = color[2]
+	data[:,:,3] = color[3]
+	return data
 
 
 ######################################################################
@@ -99,7 +162,18 @@ class Paynter:
 	color = [0, 0, 0, 1]
 	secondColor = [1, 1, 1, 1]
 
+	#Init the paynter
+	def __init__(self):
+		#Setup some stuff
+		config.CANVAS_SIZE = int(config.REAL_CANVAS_SIZE/config.DOWNSAMPLING)
+
+	#Draw a line between two points
 	def drawLine(self, x1, y1, x2, y2):
+		#Downsample the coordinates
+		x1 = int(x1/config.DOWNSAMPLING)
+		x2 = int(x2/config.DOWNSAMPLING)
+		y1 = int(y1/config.DOWNSAMPLING)
+		y2 = int(y2/config.DOWNSAMPLING)
 		print('drawing line from: '+str((x1,y1))+' to: '+str((x2,y2)))
 
 		#Calculate the direction and the length of the step
@@ -121,10 +195,21 @@ class Paynter:
 			y += length*dsin(direction)
 			previousDist = currentDist
 			currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
-			
+
+	#Draw a single dab
+	def drawPoint(self, x, y):
+		x = int(x/config.DOWNSAMPLING)
+		y = int(y/config.DOWNSAMPLING)
+		self.brush.makeDab(self.layer, int(x), int(y), self.color, self.secondColor)
+
 	#Setter for color, takes 0-255 RGBA
-	def setColor(self, r, g, b, a=255):
-		self.color = N.divide([r, g, b, a], 255)
+	def setColor(self, r=0, g=0, b=0, a=255):
+		#Separated paramters
+		if isinstance(r, int):
+			self.color = N.divide([r, g, b, a], 255)
+		#RGBA list 
+		else:
+			self.color = N.divide([r[0], r[1], r[2], r[3]], 255)
 
 	#Swap between first and second color
 	def swapColors(self):
@@ -156,10 +241,17 @@ class Brush:
 	fuzzyDabMix = 0
 	fuzzyDabScatter = 0
 
+	#Create the brush
 	def __init__(self, tipImage, maskImage, size = 50, 
 				color = [0,0,0,0], angle = 0, spacing = 1, 
 				fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0, fuzzyDabVal = 0, fuzzyDabMix = 0,
 				fuzzyDabScatter = 0):
+		#Downsample the size-related parameters
+		size = int(size/config.DOWNSAMPLING)
+		if fuzzyDabScatter!=0:
+			fuzzyDabScatter[0] = int(fuzzyDabScatter[0]/config.DOWNSAMPLING)
+			fuzzyDabScatter[1] = int(fuzzyDabScatter[1]/config.DOWNSAMPLING)
+
 		#Set the brushTip
 		if isinstance(tipImage, list):
 			#Multibrush
@@ -202,7 +294,7 @@ class Brush:
 			
 
 
-
+	#Make a single dab on the canvas
 	def makeDab(self, layer, x, y, color, secondColor):
 		#Apply scattering if any
 		if self.fuzzyDabScatter != 0:
@@ -211,13 +303,13 @@ class Brush:
 			x += dcos(randomAngle)*randomLength
 			y += dsin(randomAngle)*randomLength
 
-
+		#Round up all the coordinates and convert them to int 
 		x = int(round(x))
 		y = int(round(y))
-		debug = False
-		if debug:
+		if config.DEBUG:
 			print('-----------------------------')
-			print('make dab: '+str(x)+','+str(y))
+			print('make dab: '+str(x)+','+str(y) +' color :' +str(color))
+			print('layer: '+str(layer.shape))
 
 		#Get the brush image image 
 		brushSource = 0
@@ -243,11 +335,6 @@ class Brush:
 			
 			#Reconvert brushSource to an array
 			brushSource = N.array(img)/255
-
-
-
-
-
 
 		#Apply fuzzy color transformations
 		dabColor = N.copy(color)
@@ -275,19 +362,14 @@ class Brush:
 			#Convert back to rgb
 			dabColor[:3] = hsv2rgb(hsv)
 
-
-
-
-
 		#Get the final dab size
 		dabSizeX = brushSource.shape[0]
 		dabSizeY = brushSource.shape[1]
-		if debug:
-			print('dabSize:'+str(dabSizeX)+" ; "+str(dabSizeY))
-
+		if config.DEBUG:
+			print('dabSize:'+str(dabSizeX)+" ; "+str(dabSizeY)+' canvas:'+str(config.CANVAS_SIZE))
 
 		#Adjust coordinates and make sure we are inside (at least partially) the canvas
-		adj_x1, adj_y1 = clamp(x, 0, config.CANVAS_SIZE), clamp(y, 0, config.CANVAS_SIZE)
+		adj_x1, adj_y1 = clamp(x,          0, config.CANVAS_SIZE), clamp(y,          0, config.CANVAS_SIZE)
 		adj_x2, adj_y2 = clamp(x+dabSizeX, 0, config.CANVAS_SIZE), clamp(y+dabSizeY, 0, config.CANVAS_SIZE)
 		if adj_x1==adj_x2 or adj_y1==adj_y2:
 			return
@@ -298,31 +380,24 @@ class Brush:
 
 		#Calculate the correct range to make sure it works even on canvas border 
 		bx1 = 0 if (x>=0) else dabSizeX-adj_x2
-		bx2 = bx1+x+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
+		bx2 = bx1+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
 		by1 = 0 if (y>=0) else dabSizeY-adj_y2
-		by2 = by1+y+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
-
-
-		if debug:
-			print('brush/layer['+str(adj_y1)+":"+str(adj_y2)+','+str(adj_x1)+":"+str(adj_x2)+"]")
-			print('source = source['+str(by1)+":"+str(by2)+','+str(bx1)+":"+str(bx2)+"]")
-
-
+		by2 = by1+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
+		if config.DEBUG:
+			print('brush/layer     ['+str(adj_y1)+":"+str(adj_y2)+','+str(adj_x1)+":"+str(adj_x2)+"]")
+			print('source = source ['+str(by1)+":"+str(by2)+','+str(bx1)+":"+str(bx2)+"]")
 
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
 		source = brushSource[:,:] * dabColor
 		source = source[by1:by2, bx1:bx2, :]
-		if debug:
+		if config.DEBUG:
 			print('source shape :'+str(source.shape))
 			print('desti  shape :'+str(destination.shape))
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
 
-
-	
-
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
 		final = N.zeros((adj_y2-adj_y1, adj_x2-adj_x1, 4), dtype=N.float32)
-		if debug:
+		if config.DEBUG:
 			print('final  shape :'+str(final.shape))
 			print('-----------------------------')
 		final[:,:,0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255

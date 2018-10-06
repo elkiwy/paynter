@@ -13,75 +13,63 @@ import time
 start = time.time()
 
 #Setup config
-config.CANVAS_SIZE = 2048
+config.REAL_CANVAS_SIZE = 2048
+config.DEBUG = True
+config.DOWNSAMPLING = 4
 
 #Create the paynter
 paynter = Paynter()
 
-#Create the brushes
-pencil = Brush(
-	"gradient.png",
-	"paperGrain.png",
-	size=50,
-	angle=45,
-	spacing=0.02)
+#Create a palette
+palette = getColors_Triad(spread = 20)
+palette[0] = tweakColorVal(palette[0], -0.95)
+palette[1] = tweakColorSat(palette[1], -0.75)
+palette[2] = tweakColorSat(palette[2], -0.75)
 
-watercolor = Brush(
-	["watercolor1.png","watercolor2.png","watercolor3.png","watercolor4.png","watercolor5.png"],
-	"",
-	size=220,
-	angle=0,
-	spacing = 0.5,
-	fuzzyDabAngle = [0, 360],
-	fuzzyDabSize = [1, 3],
-	fuzzyDabHue = [-0.03, 0.03],
-	fuzzyDabSat = [-0.2, 0.2],
-	fuzzyDabVal = [-0.1, 0.1],
-	fuzzyDabMix = [0.45, 0.55],
-	fuzzyDabScatter = [0, 300])
+#Create the brushes
+pencil = Brush( "gradient.png", "paperGrain.png", size=50, angle=45, spacing=0.02)
+pixel = Brush( "pixel.png", "", size = 300, spacing = 1)
+watercolor = Brush( ["watercolor1.png","watercolor2.png","watercolor3.png","watercolor4.png","watercolor5.png"], "", size=220, angle=0, spacing = 0.5, fuzzyDabAngle = [0, 360], fuzzyDabSize = [1, 3], fuzzyDabHue = [-0.03, 0.03], fuzzyDabSat = [-0.2, 0.2], fuzzyDabVal = [-0.1, 0.1], fuzzyDabMix = [0.45, 0.55], fuzzyDabScatter = [0, 300])
 
 #Create the first layer 
-data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
-data[:,:,3] = 255
+layer = newLayer(color = palette[0])
+paynter.setLayer(layer)
 
 #Draw things
-paynter.setLayer(data)
-paynter.setBrush(pencil)
+'''
+paynter.setBrush(pixel)
+paynter.setColor(palette[0])
+paynter.drawPoint(100, 100)
+paynter.setColor(palette[1])
+paynter.drawPoint(400, 100)
+paynter.setColor(palette[2])
+paynter.drawPoint(700, 100)
+#'''
 
-
-
-
+#'''
 paynter.setBrush(watercolor)
-paynter.setColor(255, 0, 0)
-#paynter.drawLine(100, 1000, 1100, 1100)
-#paynter.drawLine(100, 1000, 1100, 1100)
-
-
+paynter.setColor(palette[1])
 gap = 384
 i=-2
-paynter.drawLine(-gap,   gap*i,	config.CANVAS_SIZE, gap*(i+1))
+paynter.drawLine(-gap,   gap*i,	config.REAL_CANVAS_SIZE+gap, gap*(i+1))
 i+=1
-while i*gap<config.CANVAS_SIZE-gap*2:
-	paynter.drawLine(config.CANVAS_SIZE,      gap*i,    0,  gap*(i+1))
-	paynter.drawLine(  -gap,  gap*(i+1),  config.CANVAS_SIZE,  gap*(i+2))
+while i*gap < config.REAL_CANVAS_SIZE:
+	paynter.drawLine(config.REAL_CANVAS_SIZE+gap,      gap*i,                    -gap,  gap*(i+1))
+	paynter.drawLine(                  -gap,  gap*(i+1),  config.REAL_CANVAS_SIZE+gap,  gap*(i+2))
 	i+=1
-paynter.drawLine(config.CANVAS_SIZE,  0+gap*i,	0, 0+gap*(i+1))
+paynter.drawLine(config.REAL_CANVAS_SIZE+gap,  0+gap*i,	-gap,   0+gap*(i+1))
+#'''
 
-
-#paynter.setColor(0, 255, 0, 255)
-#paynter.drawLine(100, 100, 1100, 1100)
-#paynter.setColor(0, 0, 255, 255)
-#paynter.drawLine(100, 100, 1100, 1100)
 
 #Make sure the alpha on the base layer is ok
-data[:,:,3] = 255
+layer[:,:,3] = 255
 
 #Print the execution time
 end = time.time()
 print('Execution time: '+str(end-start))
 
 #Show the results
-img = Image.fromarray(data, 'RGBA')
+img = Image.fromarray(layer, 'RGBA')
 img.show()
 
 
