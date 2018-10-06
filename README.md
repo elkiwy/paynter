@@ -1,31 +1,43 @@
 # What is PaYnter?
 
-PaYnter is a Python library that let you procedurally generate images with handy features that you can find in any image editing software like Photoshop, GIMP, Krita, etc...
+PaYnter is a Python module that let you procedurally generate images with handy features that emulates what you can find in any image editing software like Photoshop, GIMP, Krita, etc...
 
 
 # Features
 
 This is a list with what there is currently inside the code:
 
-- Brushes with:
+- Brushes features:
 	- Custom brush tip (B/W png images)
 	- Supports for multiple brush tips (randomized each dab)
-	- Rotated brush tip
-	- Brush spacing
+	- Custom brush tip rotation 
+	- Custom Brush spacing
 	- Custom Brush textures
+	- Fuzzy Dab parameters like:
+		- Brush size
+		- Brush angle
+		- Color mix
+		- Color Hue
+		- Color Saturation
+		- Color Value
+		- Dab position scattering
 
-- PaYnter functions:
-	- DrawLine
+- PaYnter features:
+	- Set 2 colors (foreground and background)
+	- Layer management
+	- Brush management
+	- Ease of life functions like:
+		-DrawLine(x1,y1,x2,y2)
 
 
 # How to use it
 
-Now it's too early to be usable, but this section will be filled as soon as I can make something fancy with it.
+Right now there isn't much you can do with PaYnter since is really early in the development, but you can try it by cloning the repository and playing around inside main.py, while paynter.py do all the heavy works behind the scenes.
 
 
 # Dependencies
 
-PaYnter only depends by the **Numpy** and **PIL** modules both of which can be installed with Pip, anything else should come with the python3 bundle.
+PaYnter only depends by the **Numpy** and **PIL** modules both of which can be installed easily with Pip, anything else should come with the python3 bundle.
 
 
 # Scope 
