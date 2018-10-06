@@ -9,11 +9,9 @@ import config
 
 '''
 TODO:
--Add randomization parameters for waterolours
--Add mix hue sat val fuzzy to brushdabs
 -add mirror fuzzy 
 
--fix lines out of the canvas (pencil)
+-add nice way to manage colours and create color palettes
 
 '''
 
@@ -98,9 +96,12 @@ def loadBrushTip(path, size, angle):
 class Paynter:
 	brush = 0
 	layer = 0
-	color = [0,0,0,0]
+	color = [0, 0, 0, 1]
+	secondColor = [1, 1, 1, 1]
 
 	def drawLine(self, x1, y1, x2, y2):
+		print('drawing line from: '+str((x1,y1))+' to: '+str((x2,y2)))
+
 		#Calculate the direction and the length of the step
 		direction = math.degrees(math.atan2(y2 - y1, x2 - x1))
 		length = self.brush.spacing
@@ -113,7 +114,7 @@ class Paynter:
 		#Do all the steps until I passed the target point
 		while(previousDist>currentDist):
 			#Make the dab on this point
-			self.brush.makeDab(self.layer, int(x), int(y), self.color)
+			self.brush.makeDab(self.layer, int(x), int(y), self.color, self.secondColor)
 
 			#Mode the point for the next step and update the distances
 			x += length*dcos(direction)
@@ -124,6 +125,12 @@ class Paynter:
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, r, g, b, a=255):
 		self.color = N.divide([r, g, b, a], 255)
+
+	#Swap between first and second color
+	def swapColors(self):
+		temp = N.copy(self.color)
+		self.color = self.secondColor
+		self.secondColor = temp
 
 	#Setter for layer reference
 	def setLayer(self, array):
@@ -145,9 +152,14 @@ class Brush:
 	fuzzyDabSize = 0
 	fuzzyDabHue = 0
 	fuzzyDabSat = 0
+	fuzzyDabVal = 0
+	fuzzyDabMix = 0
+	fuzzyDabScatter = 0
 
 	def __init__(self, tipImage, maskImage, size = 50, 
-				color = [0,0,0,0], angle = 0, spacing = 1, fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0):
+				color = [0,0,0,0], angle = 0, spacing = 1, 
+				fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0, fuzzyDabVal = 0, fuzzyDabMix = 0,
+				fuzzyDabScatter = 0):
 		#Set the brushTip
 		if isinstance(tipImage, list):
 			#Multibrush
@@ -168,6 +180,9 @@ class Brush:
 		self.fuzzyDabSize = fuzzyDabSize
 		self.fuzzyDabHue = fuzzyDabHue
 		self.fuzzyDabSat = fuzzyDabSat
+		self.fuzzyDabVal = fuzzyDabVal
+		self.fuzzyDabMix = fuzzyDabMix
+		self.fuzzyDabScatter = fuzzyDabScatter
 
 		#Set the brush mask
 		if maskImage!="":
@@ -188,7 +203,22 @@ class Brush:
 
 
 
-	def makeDab(self, layer, x, y, color):
+	def makeDab(self, layer, x, y, color, secondColor):
+		#Apply scattering if any
+		if self.fuzzyDabScatter != 0:
+			randomAngle = randInt(0,360)
+			randomLength = fuzzy(self.fuzzyDabScatter)
+			x += dcos(randomAngle)*randomLength
+			y += dsin(randomAngle)*randomLength
+
+
+		x = int(round(x))
+		y = int(round(y))
+		debug = False
+		if debug:
+			print('-----------------------------')
+			print('make dab: '+str(x)+','+str(y))
+
 		#Get the brush image image 
 		brushSource = 0
 		if self.multibrush:
@@ -221,7 +251,14 @@ class Brush:
 
 		#Apply fuzzy color transformations
 		dabColor = N.copy(color)
-		if self.fuzzyDabHue!=0 or self.fuzzyDabSat!=0:
+		if self.fuzzyDabHue!=0 or self.fuzzyDabSat!=0 or self.fuzzyDabVal!=0 or self.fuzzyDabMix!=0:
+			#Mix colors
+			if self.fuzzyDabMix!=0:
+				fuz = fuzzy(self.fuzzyDabMix)
+				dabColor[0] = min(1, (dabColor[0]*(1-fuz) + secondColor[0]*fuz))
+				dabColor[1] = min(1, (dabColor[1]*(1-fuz) + secondColor[1]*fuz))
+				dabColor[2] = min(1, (dabColor[2]*(1-fuz) + secondColor[2]*fuz))
+				
 			#Convert to hsv
 			hsv = rgb2hsv(dabColor[:3])
 
@@ -231,6 +268,9 @@ class Brush:
 			#Fuzzy Saturation
 			if self.fuzzyDabSat!=0:
 				hsv[1] = clamp(hsv[1] + fuzzy(self.fuzzyDabSat), 0, 1)
+			#Fuzzy Value
+			if self.fuzzyDabVal!=0:
+				hsv[2] = clamp(hsv[2] + fuzzy(self.fuzzyDabVal), 0, 1)
 
 			#Convert back to rgb
 			dabColor[:3] = hsv2rgb(hsv)
@@ -239,11 +279,12 @@ class Brush:
 
 
 
-
-
 		#Get the final dab size
 		dabSizeX = brushSource.shape[0]
 		dabSizeY = brushSource.shape[1]
+		if debug:
+			print('dabSize:'+str(dabSizeX)+" ; "+str(dabSizeY))
+
 
 		#Adjust coordinates and make sure we are inside (at least partially) the canvas
 		adj_x1, adj_y1 = clamp(x, 0, config.CANVAS_SIZE), clamp(y, 0, config.CANVAS_SIZE)
@@ -257,17 +298,33 @@ class Brush:
 
 		#Calculate the correct range to make sure it works even on canvas border 
 		bx1 = 0 if (x>=0) else dabSizeX-adj_x2
-		bx2 = x+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
+		bx2 = bx1+x+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
 		by1 = 0 if (y>=0) else dabSizeY-adj_y2
-		by2 = y+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
+		by2 = by1+y+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
+
+
+		if debug:
+			print('brush/layer['+str(adj_y1)+":"+str(adj_y2)+','+str(adj_x1)+":"+str(adj_x2)+"]")
+			print('source = source['+str(by1)+":"+str(by2)+','+str(bx1)+":"+str(bx2)+"]")
+
+
 
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
 		source = brushSource[:,:] * dabColor
 		source = source[by1:by2, bx1:bx2, :]
+		if debug:
+			print('source shape :'+str(source.shape))
+			print('desti  shape :'+str(destination.shape))
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
+
+
+	
 
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
 		final = N.zeros((adj_y2-adj_y1, adj_x2-adj_x1, 4), dtype=N.float32)
+		if debug:
+			print('final  shape :'+str(final.shape))
+			print('-----------------------------')
 		final[:,:,0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255
 		final[:,:,1] = ((destination[:,:,1] * (1-source[:,:,3])) + (source[:,:,1] * (source[:,:,3])))*255
 		final[:,:,2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255		

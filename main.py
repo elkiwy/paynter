@@ -31,32 +31,43 @@ watercolor = Brush(
 	"",
 	size=220,
 	angle=0,
-	spacing = 0.75,
+	spacing = 0.5,
 	fuzzyDabAngle = [0, 360],
-	fuzzyDabSize = [1, 2],
-	fuzzyDabHue = [-0.1, 0.1],
-	fuzzyDabSat = [-1, 1])
+	fuzzyDabSize = [1, 3],
+	fuzzyDabHue = [-0.03, 0.03],
+	fuzzyDabSat = [-0.2, 0.2],
+	fuzzyDabVal = [-0.1, 0.1],
+	fuzzyDabMix = [0.45, 0.55],
+	fuzzyDabScatter = [0, 300])
 
 #Create the first layer 
 data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
 data[:,:,3] = 255
-data[:,:256,:3] = 255
 
 #Draw things
 paynter.setLayer(data)
 paynter.setBrush(pencil)
-#paynter.setColor(255, 0, 0)
-#paynter.drawLine( -100,  100, 3000,  100)
-#paynter.drawLine(  100, -100,  100, 3000)
-#paynter.drawLine( -100, -100, 3000, 3000)
-#paynter.drawLine( 3000, -100, -100, 3000)
-#
-#paynter.setColor(255, 255, 255, 255)
-#paynter.drawLine(100, 200, 900, 200)
+
+
+
 
 paynter.setBrush(watercolor)
-paynter.setColor(255, 0, 0, 255)
-paynter.drawLine(100, 1000, 1100, 1100)
+paynter.setColor(255, 0, 0)
+#paynter.drawLine(100, 1000, 1100, 1100)
+#paynter.drawLine(100, 1000, 1100, 1100)
+
+
+gap = 384
+i=-2
+paynter.drawLine(-gap,   gap*i,	config.CANVAS_SIZE, gap*(i+1))
+i+=1
+while i*gap<config.CANVAS_SIZE-gap*2:
+	paynter.drawLine(config.CANVAS_SIZE,      gap*i,    0,  gap*(i+1))
+	paynter.drawLine(  -gap,  gap*(i+1),  config.CANVAS_SIZE,  gap*(i+2))
+	i+=1
+paynter.drawLine(config.CANVAS_SIZE,  0+gap*i,	0, 0+gap*(i+1))
+
+
 #paynter.setColor(0, 255, 0, 255)
 #paynter.drawLine(100, 100, 1100, 1100)
 #paynter.setColor(0, 0, 255, 255)
