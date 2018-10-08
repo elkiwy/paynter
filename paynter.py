@@ -10,11 +10,14 @@ import config
 '''
 TODO:
 -add mirror fuzzy 
+-add flood fill
+-Add proper layer effects managing
 
--add nice way to manage colours and create color palettes
 
 '''
 
+resizeResample = PIL.Image.LANCZOS
+rotateResample = PIL.Image.NEAREST
 
 
 ######################################################################
@@ -59,7 +62,7 @@ def loadBrushTip(path, size, angle):
 	res = PIL.Image.open(path).convert('RGB')
 	
 	#Resize it to the target size
-	resScaled = res.resize((size, size), resample=PIL.Image.LANCZOS)
+	resScaled = res.resize((size, size), resample=resizeResample)
 	
 	#Invert and grab the value
 	resScaled = PIL.ImageOps.invert(resScaled)
@@ -141,19 +144,42 @@ def tweakColorVal(rgba, ammount):
 ######################################################################
 # Layer Functions
 ######################################################################
+#The layer class the the one holding all the data and effecct to show how to add colors when merging layers
+class Layer:
+	effect = ''
+	data = 0
 
-#Create a new layer
-def newLayer(color = [255,255,255,255]):
-	data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
-	data[:,:,0] = color[0]
-	data[:,:,1] = color[1]
-	data[:,:,2] = color[2]
-	data[:,:,3] = color[3]
-	return data
+	def __init__(self, color = [255,255,255,255], effect = ''):
+		self.data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
+		self.data[:,:,0] = color[0]
+		self.data[:,:,1] = color[1]
+		self.data[:,:,2] = color[2]
+		self.data[:,:,3] = color[3]
+		self.effect = effect
 
 
 ######################################################################
-# Main classes
+# Image Functions
+######################################################################
+#The image class is a container for all the layers of the image
+class Image:
+	layers = []
+	activeLayer = 0
+
+	#Init image
+	def __init__(self):
+		#Init by adding a new layer and selecting that as current layer
+		self.layers.append(Layer())
+		self.activeLayer = 0
+
+	#Return the current active layer
+	def getActiveLayer(self):
+		return self.layers[self.activeLayer]
+
+
+
+######################################################################
+# Paynter class
 ######################################################################
 #The paynter class is the object that draw stuff on a layer using a brush and a color
 class Paynter:
@@ -161,11 +187,13 @@ class Paynter:
 	layer = 0
 	color = [0, 0, 0, 1]
 	secondColor = [1, 1, 1, 1]
+	image = 0
 
 	#Init the paynter
 	def __init__(self):
 		#Setup some stuff
 		config.CANVAS_SIZE = int(config.REAL_CANVAS_SIZE/config.DOWNSAMPLING)
+		self.image = Image()
 
 	#Draw a line between two points
 	def drawLine(self, x1, y1, x2, y2):
@@ -184,11 +212,11 @@ class Paynter:
 		x, y = x1, y1
 		currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
 		previousDist = currentDist+1
-		
+
 		#Do all the steps until I passed the target point
 		while(previousDist>currentDist):
 			#Make the dab on this point
-			self.brush.makeDab(self.layer, int(x), int(y), self.color, self.secondColor)
+			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor)
 
 			#Mode the point for the next step and update the distances
 			x += length*dcos(direction)
@@ -200,7 +228,14 @@ class Paynter:
 	def drawPoint(self, x, y):
 		x = int(x/config.DOWNSAMPLING)
 		y = int(y/config.DOWNSAMPLING)
-		self.brush.makeDab(self.layer, int(x), int(y), self.color, self.secondColor)
+		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor)
+
+	#Fill the current layer with a color
+	def fillLayerWithColor(self, color):
+		layer = self.image.getActiveLayer().data
+		layer[:,:,0] = color[0]
+		layer[:,:,1] = color[1]
+		layer[:,:,2] = color[2]
 
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, r=0, g=0, b=0, a=255):
@@ -217,14 +252,25 @@ class Paynter:
 		self.color = self.secondColor
 		self.secondColor = temp
 
-	#Setter for layer reference
-	def setLayer(self, array):
-		self.layer = array
-
 	#Setter for brush reference
 	def setBrush(self, b):
 		self.brush = b
 
+
+	def renderImage(self):
+		bottomLayer = self.image.getActiveLayer().data
+
+		#Make sure the alpha on the base layer is ok
+		bottomLayer[:,:,3] = 255
+
+		#Show the results
+		img = PIL.Image.fromarray(bottomLayer, 'RGBA')
+		img.show()
+
+
+######################################################################
+# Brush class
+######################################################################
 
 #The brush class is the one that define how the current brush should behave
 class Brush:
@@ -296,6 +342,9 @@ class Brush:
 
 	#Make a single dab on the canvas
 	def makeDab(self, layer, x, y, color, secondColor):
+		#Extract the layerData
+		layer = layer.data
+
 		#Apply scattering if any
 		if self.fuzzyDabScatter != 0:
 			randomAngle = randInt(0,360)
@@ -325,13 +374,13 @@ class Brush:
 			
 			#Apply fuzzy scale
 			if self.fuzzyDabAngle!=0:
-				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1, resample=PIL.Image.BICUBIC)
+				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1, resample=rotateResample)
 				brushSource = N.array(img)/255
 
 			#Apply fuzzy scale
 			if self.fuzzyDabSize!=0:
 				fuz = fuzzy(self.fuzzyDabSize)
-				img = img.resize((int(img.width*fuz), int(img.height*fuz)), resample=PIL.Image.LANCZOS)
+				img = img.resize((int(img.width*fuz), int(img.height*fuz)), resample=resizeResample)
 			
 			#Reconvert brushSource to an array
 			brushSource = N.array(img)/255

@@ -14,26 +14,25 @@ start = time.time()
 
 #Setup config
 config.REAL_CANVAS_SIZE = 2048
-config.DEBUG = True
-config.DOWNSAMPLING = 4
+config.DEBUG = False
+config.DOWNSAMPLING = 2
 
 #Create the paynter
 paynter = Paynter()
 
 #Create a palette
 palette = getColors_Triad(spread = 20)
-palette[0] = tweakColorVal(palette[0], -0.95)
+palette[0] = tweakColorVal(palette[0], -0.9)
 palette[1] = tweakColorSat(palette[1], -0.75)
 palette[2] = tweakColorSat(palette[2], -0.75)
 
 #Create the brushes
 pencil = Brush( "gradient.png", "paperGrain.png", size=50, angle=45, spacing=0.02)
 pixel = Brush( "pixel.png", "", size = 300, spacing = 1)
-watercolor = Brush( ["watercolor1.png","watercolor2.png","watercolor3.png","watercolor4.png","watercolor5.png"], "", size=220, angle=0, spacing = 0.5, fuzzyDabAngle = [0, 360], fuzzyDabSize = [1, 3], fuzzyDabHue = [-0.03, 0.03], fuzzyDabSat = [-0.2, 0.2], fuzzyDabVal = [-0.1, 0.1], fuzzyDabMix = [0.45, 0.55], fuzzyDabScatter = [0, 300])
+watercolor = Brush( ["watercolor1.png","watercolor2.png","watercolor3.png","watercolor4.png","watercolor5.png"], "", size=440, angle=0, spacing = 0.5, fuzzyDabAngle = [0, 360], fuzzyDabSize = [1, 2], fuzzyDabHue = [-0.03, 0.03], fuzzyDabSat = [-0.2, 0.2], fuzzyDabVal = [-0.1, 0.1], fuzzyDabMix = [0.45, 0.55], fuzzyDabScatter = [0, 300])
 
-#Create the first layer 
-layer = newLayer(color = palette[0])
-paynter.setLayer(layer)
+
+paynter.fillLayerWithColor(palette[0])
 
 #Draw things
 '''
@@ -61,16 +60,12 @@ paynter.drawLine(config.REAL_CANVAS_SIZE+gap,  0+gap*i,	-gap,   0+gap*(i+1))
 #'''
 
 
-#Make sure the alpha on the base layer is ok
-layer[:,:,3] = 255
 
 #Print the execution time
 end = time.time()
 print('Execution time: '+str(end-start))
 
-#Show the results
-img = Image.fromarray(layer, 'RGBA')
-img.show()
+paynter.renderImage()
 
 
 
