@@ -14,6 +14,7 @@ TODO:
 -Add proper layer effects managing
 
 
+
 '''
 
 resizeResample = PIL.Image.LANCZOS
@@ -149,13 +150,40 @@ class Layer:
 	effect = ''
 	data = 0
 
-	def __init__(self, color = [255,255,255,255], effect = ''):
-		self.data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
-		self.data[:,:,0] = color[0]
-		self.data[:,:,1] = color[1]
-		self.data[:,:,2] = color[2]
-		self.data[:,:,3] = color[3]
+	def __init__(self, data = None, color = [255,255,255,0], effect = ''):
+		if type(data) is not N.ndarray:
+			self.data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
+			self.data[:,:,0] = color[0]
+			self.data[:,:,1] = color[1]
+			self.data[:,:,2] = color[2]
+			self.data[:,:,3] = color[3]
+		else:
+			self.data = data
 		self.effect = effect
+
+	def showLayer(self, title=''):
+		PIL.Image.fromarray(self.data, 'RGBA').show(title=title)
+
+
+def lighten(img_in, img_layer, opacity):
+	img_in /= 255.0
+	img_layer /= 255.0
+
+	print(img_in)
+	comp_alpha = N.minimum(img_in[:, :, 3], img_layer[:, :, 3])*opacity
+	new_alpha = img_in[:, :, 3] + (1.0 - img_in[:, :, 3])*comp_alpha
+	ratio = comp_alpha/new_alpha
+	ratio[ratio == N.NAN] = 0.0
+
+	print(ratio)
+
+	comp = N.maximum(img_in[:, :, :3], img_layer[:, :, :3])
+	ratio_rs = N.reshape(N.repeat(ratio, 3), [comp.shape[0], comp.shape[1], comp.shape[2]])
+	img_out = comp*ratio_rs + img_in[:, :, :3] * (1.0-ratio_rs)
+	img_out = N.nan_to_num(N.dstack((img_out, img_in[:, :, 3])))  # add alpha channel and replace nans
+	
+	print(img_out)
+	return img_out*255.0
 
 
 ######################################################################
@@ -170,11 +198,44 @@ class Image:
 	def __init__(self):
 		#Init by adding a new layer and selecting that as current layer
 		self.layers.append(Layer())
-		self.activeLayer = 0
+		self.activeLayer = len(self.layers)-1
 
 	#Return the current active layer
 	def getActiveLayer(self):
 		return self.layers[self.activeLayer]
+
+	#Create a new layer and select it
+	def newLayer(self, effect=''):
+		self.layers.append(Layer(effect = effect))
+		self.activeLayer = len(self.layers)-1
+
+	def mergeAllLayers(self):
+		while(len(self.layers)>1):
+			self.mergeTopLayers()
+		return self.layers[0]
+
+	def mergeTopLayers(self):
+		print('merging top layers')
+		if self.layers[-1].effect=='lighten':
+			baseImage = self.layers[-2].data.astype(N.float32)
+			overImage = self.layers[-1].data.astype(N.float32)
+			newImage = lighten(baseImage, overImage, 1).astype(N.uint8)
+			self.layers.pop()
+			self.layers.pop()
+			finalLayer = Layer(data = newImage)
+			finalLayer.showLayer('test')
+			self.layers.append(finalLayer)
+
+
+		else:
+			baseImage = PIL.Image.fromarray(self.layers[-2].data, 'RGBA')
+			overImage = PIL.Image.fromarray(self.layers[-1].data, 'RGBA')
+			baseImage.paste(overImage, (0, 0), overImage)
+			self.layers.pop()
+			self.layers.pop()
+			self.layers.append(Layer(data = N.array(baseImage)))
+			
+
 
 
 
@@ -258,13 +319,18 @@ class Paynter:
 
 
 	def renderImage(self):
-		bottomLayer = self.image.getActiveLayer().data
-
 		#Make sure the alpha on the base layer is ok
-		bottomLayer[:,:,3] = 255
+		self.image.layers[0].data[:,:,3] = 255
+
+		for layer in self.image.layers:
+			layer.showLayer()
+
+
+		resultLayerData = self.image.mergeAllLayers().data
+
 
 		#Show the results
-		img = PIL.Image.fromarray(bottomLayer, 'RGBA')
+		img = PIL.Image.fromarray(resultLayerData, 'RGBA')
 		img.show()
 
 
