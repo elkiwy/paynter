@@ -211,29 +211,34 @@ class Image:
 
 	def mergeAllLayers(self):
 		while(len(self.layers)>1):
-			self.mergeTopLayers()
+			self.mergeBottomLayers()
 		return self.layers[0]
 
-	def mergeTopLayers(self):
+	def mergeBottomLayers(self):
 		print('merging top layers')
-		if self.layers[-1].effect=='lighten':
-			baseImage = self.layers[-2].data.astype(N.float32)
-			overImage = self.layers[-1].data.astype(N.float32)
+		if self.layers[1].effect=='lighten':
+			baseImage = self.layers[0].data.astype(N.float32)
+			overImage = self.layers[1].data.astype(N.float32)
 			newImage = lighten(baseImage, overImage, 1).astype(N.uint8)
-			self.layers.pop()
-			self.layers.pop()
+			#self.layers.pop()
+			#self.layers.pop()
+			del self.layers[0]
+			#del self.layers[0]
 			finalLayer = Layer(data = newImage)
 			finalLayer.showLayer('test')
-			self.layers.append(finalLayer)
+			self.layers[0] = finalLayer
 
 
 		else:
-			baseImage = PIL.Image.fromarray(self.layers[-2].data, 'RGBA')
-			overImage = PIL.Image.fromarray(self.layers[-1].data, 'RGBA')
+			baseImage = PIL.Image.fromarray(self.layers[0].data, 'RGBA')
+			overImage = PIL.Image.fromarray(self.layers[1].data, 'RGBA')
 			baseImage.paste(overImage, (0, 0), overImage)
-			self.layers.pop()
-			self.layers.pop()
-			self.layers.append(Layer(data = N.array(baseImage)))
+			del self.layers[0]
+			#del self.layers[0]
+			self.layers[0] = Layer(data = N.array(baseImage))
+			#self.layers.append(Layer(data = N.array(baseImage)))
+
+		self.layers[0].showLayer()
 			
 
 
@@ -322,8 +327,8 @@ class Paynter:
 		#Make sure the alpha on the base layer is ok
 		self.image.layers[0].data[:,:,3] = 255
 
-		for layer in self.image.layers:
-			layer.showLayer()
+		#for layer in self.image.layers:
+		#	layer.showLayer()
 
 
 		resultLayerData = self.image.mergeAllLayers().data
