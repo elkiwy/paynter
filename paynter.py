@@ -6,13 +6,17 @@ import math
 import colorsys
 
 import config
+import PIL.ImageFont
+import PIL.ImageDraw 
+
+import blendModes
 
 '''
 TODO:
 -add mirror fuzzy 
 -add flood fill
 -Add proper layer effects managing
-
+-Add all the blend modes in a separate file and give proper credits to who made them
 
 
 '''
@@ -161,10 +165,18 @@ class Layer:
 			self.data = data
 		self.effect = effect
 
-	def showLayer(self, title=''):
-		PIL.Image.fromarray(self.data, 'RGBA').show(title=title)
+	def showLayer(self, title='', debugText=''):
+		img = PIL.Image.fromarray(self.data, 'RGBA')
+		if debugText!='':
+			draw = PIL.ImageDraw.Draw(img)
+			font = PIL.ImageFont.truetype("DejaVuSansMono.ttf", 24)
+			draw.text((0, 0),debugText,(255,255,255),font=font)
+		img.show(title=title)
 
 
+
+
+#
 def lighten(img_in, img_layer, opacity):
 	img_in /= 255.0
 	img_layer /= 255.0
@@ -209,36 +221,35 @@ class Image:
 		self.layers.append(Layer(effect = effect))
 		self.activeLayer = len(self.layers)-1
 
+	#Merge all the layers together to render the final image
 	def mergeAllLayers(self):
 		while(len(self.layers)>1):
 			self.mergeBottomLayers()
 		return self.layers[0]
 
+	#Merge the bottom layer with the layer above that
 	def mergeBottomLayers(self):
-		print('merging top layers')
-		if self.layers[1].effect=='lighten':
-			baseImage = self.layers[0].data.astype(N.float32)
-			overImage = self.layers[1].data.astype(N.float32)
-			newImage = lighten(baseImage, overImage, 1).astype(N.uint8)
-			#self.layers.pop()
-			#self.layers.pop()
-			del self.layers[0]
-			#del self.layers[0]
-			finalLayer = Layer(data = newImage)
-			finalLayer.showLayer('test')
-			self.layers[0] = finalLayer
+		#Debug show the two layer being merged
+		#self.layers[0].showLayer(debugText='baseLayer'+str(len(self.layers)))
+		#self.layers[1].showLayer(debugText='overLayer'+str(len(self.layers)))
 
-
-		else:
+		#Normal paste on top
+		if self.layers[1].effect=='':
 			baseImage = PIL.Image.fromarray(self.layers[0].data, 'RGBA')
 			overImage = PIL.Image.fromarray(self.layers[1].data, 'RGBA')
-			baseImage.paste(overImage, (0, 0), overImage)
-			del self.layers[0]
-			#del self.layers[0]
-			self.layers[0] = Layer(data = N.array(baseImage))
-			#self.layers.append(Layer(data = N.array(baseImage)))
+			newImage = N.array(baseImage.paste(overImage, (0, 0), overImage))
 
-		self.layers[0].showLayer()
+		#Apply blend mode
+		else:
+			baseImage = self.layers[0].data.astype(N.float32)
+			overImage = self.layers[1].data.astype(N.float32)
+			newImage = mergeImagesWithBlendMode(baseImage, overImage, self.layers[1].effect).astype(N.uint8)
+
+		#Remove one layer and replace the last one
+		del self.layers[0]			
+		self.layers[0] = Layer(data = newImage)
+
+		#self.layers[0].showLayer(debugText='merging layers'+str(len(self.layers)))
 			
 
 
