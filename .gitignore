@@ -1,6 +1,14 @@
 
 # Created by https://www.gitignore.io/api/python
 
+
+# Remove main.py from repo
+main.py
+
+
+
+
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

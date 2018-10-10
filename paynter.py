@@ -9,20 +9,18 @@ import config
 import PIL.ImageFont
 import PIL.ImageDraw 
 
-import blendModes
+from blendModes import *
 
 '''
 TODO:
 -add mirror fuzzy 
 -add flood fill
--Add proper layer effects managing
--Add all the blend modes in a separate file and give proper credits to who made them
 
 
 '''
 
 resizeResample = PIL.Image.LANCZOS
-rotateResample = PIL.Image.NEAREST
+rotateResample = PIL.Image.BILINEAR
 
 
 ######################################################################
@@ -154,6 +152,7 @@ class Layer:
 	effect = ''
 	data = 0
 
+	#Layer constructor
 	def __init__(self, data = None, color = [255,255,255,0], effect = ''):
 		if type(data) is not N.ndarray:
 			self.data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
@@ -165,6 +164,7 @@ class Layer:
 			self.data = data
 		self.effect = effect
 
+	#Show layer as a separate image with the option to write on it 
 	def showLayer(self, title='', debugText=''):
 		img = PIL.Image.fromarray(self.data, 'RGBA')
 		if debugText!='':
@@ -174,28 +174,6 @@ class Layer:
 		img.show(title=title)
 
 
-
-
-#
-def lighten(img_in, img_layer, opacity):
-	img_in /= 255.0
-	img_layer /= 255.0
-
-	print(img_in)
-	comp_alpha = N.minimum(img_in[:, :, 3], img_layer[:, :, 3])*opacity
-	new_alpha = img_in[:, :, 3] + (1.0 - img_in[:, :, 3])*comp_alpha
-	ratio = comp_alpha/new_alpha
-	ratio[ratio == N.NAN] = 0.0
-
-	print(ratio)
-
-	comp = N.maximum(img_in[:, :, :3], img_layer[:, :, :3])
-	ratio_rs = N.reshape(N.repeat(ratio, 3), [comp.shape[0], comp.shape[1], comp.shape[2]])
-	img_out = comp*ratio_rs + img_in[:, :, :3] * (1.0-ratio_rs)
-	img_out = N.nan_to_num(N.dstack((img_out, img_in[:, :, 3])))  # add alpha channel and replace nans
-	
-	print(img_out)
-	return img_out*255.0
 
 
 ######################################################################
@@ -237,7 +215,8 @@ class Image:
 		if self.layers[1].effect=='':
 			baseImage = PIL.Image.fromarray(self.layers[0].data, 'RGBA')
 			overImage = PIL.Image.fromarray(self.layers[1].data, 'RGBA')
-			newImage = N.array(baseImage.paste(overImage, (0, 0), overImage))
+			baseImage.paste(overImage, (0, 0), overImage)
+			newImage = N.array(baseImage)
 
 		#Apply blend mode
 		else:
@@ -249,6 +228,7 @@ class Image:
 		del self.layers[0]			
 		self.layers[0] = Layer(data = newImage)
 
+		#Debug show the result layer
 		#self.layers[0].showLayer(debugText='merging layers'+str(len(self.layers)))
 			
 
@@ -338,12 +318,9 @@ class Paynter:
 		#Make sure the alpha on the base layer is ok
 		self.image.layers[0].data[:,:,3] = 255
 
-		#for layer in self.image.layers:
-		#	layer.showLayer()
-
-
-		resultLayerData = self.image.mergeAllLayers().data
-
+		#Merge all the layers to apply blending modes
+		resultLayer = self.image.mergeAllLayers()
+		resultLayerData = resultLayer.data
 
 		#Show the results
 		img = PIL.Image.fromarray(resultLayerData, 'RGBA')

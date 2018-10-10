@@ -2,12 +2,10 @@
 This file is a custom and more compact version of 'blend_modes' made by Florian Roscheck.
 You can find more about it here at https://pythonhosted.org/blend_modes/
 '''
-
 import numpy as np
 
-
-
-def mergeImagesWithBlendMode(img_in, img_out, blendMode):
+#Works on 0-255 float arrays and outputs a 0-255 float array
+def mergeImagesWithBlendMode(img_in, img_layer, blendMode, opacity=1):
     #Take the 0-255 input and convert to 0-1 range
     img_in /= 255
     img_layer /= 255.0
@@ -19,6 +17,7 @@ def mergeImagesWithBlendMode(img_in, img_out, blendMode):
     np.seterr(divide='ignore', invalid='ignore')
     ratio = comp_alpha/new_alpha
     ratio[ratio == np.NAN] = 0.0
+    comp = 0
 
     #Soft light
     if blendMode=='soft_light':
@@ -26,7 +25,7 @@ def mergeImagesWithBlendMode(img_in, img_out, blendMode):
                    + img_in[:, :, :3] * (1.0 - (1.0-img_in[:, :, :3])*(1.0-img_layer[:, :, :3]))
     
     #Lighten only    
-    elif blendMode=='lighten_only':
+    elif blendMode=='lighten':
         comp = np.maximum(img_in[:, :, :3], img_layer[:, :, :3])
 
     #Screen
@@ -42,7 +41,7 @@ def mergeImagesWithBlendMode(img_in, img_out, blendMode):
         comp = img_in[:, :, :3] + img_layer[:, :, :3]
 
     #Darken only
-    elif blendMode=='darken_only':
+    elif blendMode=='darken':
         comp = np.minimum(img_in[:, :, :3], img_layer[:, :, :3])
 
     #Multiply
@@ -79,7 +78,9 @@ def mergeImagesWithBlendMode(img_in, img_out, blendMode):
     elif blendMode=='overlay':
         comp = img_in[:,:,:3] * (img_in[:,:,:3] + (2 * img_layer[:,:,:3]) * (1 - img_in[:,:,:3]))
 
-    
+    else:
+        print('ERROR: wrong blendMode:'+str(blendMode))
+
     #Compose img_out
     ratio_rs = np.reshape(np.repeat(ratio, 3), [comp.shape[0], comp.shape[1], comp.shape[2]])
     img_out = np.clip(comp * ratio_rs + img_in[:, :, :3] * (1.0 - ratio_rs), 0.0, 1.0)
