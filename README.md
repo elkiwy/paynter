@@ -23,16 +23,21 @@ This is a list with what there is currently inside the code:
 		- Dab position scattering
 
 - PaYnter features:
-	- Set 2 colors (foreground and background)
 	- Layer management
+		- New layer creation
+		- Layer merging with blending modes
 	- Brush management
-	- Ease of life functions like:
-		-DrawLine(x1,y1,x2,y2)
+	- Palette and colors management
+		- Triad palette
+		- Separate Hue, Saturation, and Value tweaking
+	- Drawing functions like:
+		- DrawLine(x1, y1, x2, y2)
+		- DrawPoint(x, y)
 
 
 # How to use it
 
-Right now there isn't much you can do with PaYnter since is really early in the development, but you can try it by cloning the repository and playing around inside main.py, while paynter.py do all the heavy works behind the scenes.
+Right now there isn't much you can do with PaYnter since is really early in the development, but you can try it by cloning the repository and playing around inside example.py, while paynter.py do all the heavy works behind the scenes.
 
 
 # Dependencies
