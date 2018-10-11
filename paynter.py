@@ -15,12 +15,12 @@ from blendModes import *
 TODO:
 -add mirror fuzzy 
 -add flood fill
-
+- double check alpha blending because there is still something wrong
 
 '''
 
 resizeResample = PIL.Image.LANCZOS
-rotateResample = PIL.Image.BILINEAR
+rotateResample = PIL.Image.BICUBIC
 
 
 ######################################################################
@@ -82,6 +82,25 @@ def loadBrushTip(path, size, angle):
 	#Return this 3D array full white and alpha 0-1 values
 	return bt
 
+#Rotate a list of points around a center for an angle
+def rotateMatrix(pointList, cx, cy, angle):
+	rotatedPoints = []
+	#For each point in the list
+	for point in pointList:
+		#Grab the coords and get dir and len
+		oldX = point[0]
+		oldY = point[1]
+		direction = math.degrees(math.atan2(cy-oldY, cx-oldX))
+		length = math.sqrt((cx - oldX)**2 + (cy - oldY)**2)
+
+		#Rotate them and insert in the return list
+		newX = cx+length*dcos(direction+angle)
+		newY = cy+length*dsin(direction+angle)
+		rotatedPoints.append([newX, newY])
+	return rotatedPoints
+
+
+
 
 ######################################################################
 # Color Management functions
@@ -141,6 +160,7 @@ def tweakColorVal(rgba, ammount):
 	rgba[1] *= 255
 	rgba[2] *= 255
 	return rgba
+
 
 
 
@@ -234,7 +254,6 @@ class Image:
 
 
 
-
 ######################################################################
 # Paynter class
 ######################################################################
@@ -287,6 +306,29 @@ class Paynter:
 		y = int(y/config.DOWNSAMPLING)
 		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor)
 
+	#Draw a path from a series of points
+	def drawPath(self, pointList):
+		self.drawLine(pointList[0][0], pointList[0][1], pointList[1][0], pointList[1][1])
+		i = 1
+		while i<len(pointList)-1:
+			self.drawLine(pointList[i][0], pointList[i][1], pointList[i+1][0], pointList[i+1][1])
+			i+=1
+
+	#Draw a path from a series of points
+	def drawClosedPath(self, pointList):
+		self.drawLine(pointList[0][0], pointList[0][1], pointList[1][0], pointList[1][1])
+		i = 1
+		while i<len(pointList)-1:
+			self.drawLine(pointList[i][0], pointList[i][1], pointList[i+1][0], pointList[i+1][1])
+			i+=1
+		self.drawLine(pointList[-1][0], pointList[-1][1], pointList[0][0], pointList[0][1])
+		
+	#Draw a rectangle
+	def drawRect(self, x1, y1, x2, y2, angle=0):
+		vertices = [[x1,y1],[x2,y1],[x2,y2],[x1,y2],]
+		rotatedVertices = rotateMatrix(vertices, (x1+x2)*0.5, (y1+y2)*0.5, angle)
+		self.drawClosedPath(rotatedVertices)
+
 	#Fill the current layer with a color
 	def fillLayerWithColor(self, color):
 		layer = self.image.getActiveLayer().data
@@ -313,7 +355,7 @@ class Paynter:
 	def setBrush(self, b):
 		self.brush = b
 
-
+	#Render the final image
 	def renderImage(self):
 		#Make sure the alpha on the base layer is ok
 		self.image.layers[0].data[:,:,3] = 255
@@ -325,6 +367,8 @@ class Paynter:
 		#Show the results
 		img = PIL.Image.fromarray(resultLayerData, 'RGBA')
 		img.show()
+
+
 
 
 ######################################################################

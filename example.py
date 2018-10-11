@@ -6,7 +6,7 @@ import config
 #Setup config
 config.REAL_CANVAS_SIZE = 2048
 config.DEBUG = False
-config.DOWNSAMPLING = 2
+config.DOWNSAMPLING = 1
 
 #Create the paynter and get the image
 paynter = Paynter()
@@ -38,10 +38,27 @@ paynter.drawLine(0, config.REAL_CANVAS_SIZE/1.5, config.REAL_CANVAS_SIZE, config
 image.newLayer(effect='lighten')
 paynter.setBrush(pencil)
 paynter.setColor(palette[2])
-paynter.setBrush(pencil)
 paynter.drawLine(100,100,500,200)
 paynter.drawLine(100,200,500,300)
 paynter.drawLine(100,300,500,400)
+
+
+
+pointList = []
+pointList.append([300,300])
+pointList.append([400,300])
+pointList.append([400,400])
+pointList.append([300,400])
+pointList.append([300,300])
+paynter.drawPath(pointList)
+
+paynter.drawRect(500, 300, 600, 400)
+
+paynter.drawRect(700, 300, 800, 400, 45)
+
+
+
+
 
 #Render the final image
 paynter.renderImage()
