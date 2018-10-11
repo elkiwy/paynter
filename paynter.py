@@ -235,7 +235,7 @@ class Image:
 		if self.layers[1].effect=='':
 			baseImage = PIL.Image.fromarray(self.layers[0].data, 'RGBA')
 			overImage = PIL.Image.fromarray(self.layers[1].data, 'RGBA')
-			baseImage.paste(overImage, (0, 0), overImage)
+			baseImage = PIL.Image.alpha_composite(baseImage, overImage)
 			newImage = N.array(baseImage)
 
 		#Apply blend mode
@@ -335,6 +335,7 @@ class Paynter:
 		layer[:,:,0] = color[0]
 		layer[:,:,1] = color[1]
 		layer[:,:,2] = color[2]
+		layer[:,:,3] = color[3]
 
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, r=0, g=0, b=0, a=255):
@@ -358,7 +359,7 @@ class Paynter:
 	#Render the final image
 	def renderImage(self):
 		#Make sure the alpha on the base layer is ok
-		self.image.layers[0].data[:,:,3] = 255
+		#self.image.layers[0].data[:,:,3] = 255
 
 		#Merge all the layers to apply blending modes
 		resultLayer = self.image.mergeAllLayers()
@@ -527,7 +528,7 @@ class Brush:
 			return
 
 		#Get the slice and uniform to [0-1]
-		destination = layer[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)
+		destination = N.copy(layer[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32))
 		destination /= 255
 
 		#Calculate the correct range to make sure it works even on canvas border 
@@ -552,11 +553,23 @@ class Brush:
 		if config.DEBUG:
 			print('final  shape :'+str(final.shape))
 			print('-----------------------------')
+
 		final[:,:,0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255
 		final[:,:,1] = ((destination[:,:,1] * (1-source[:,:,3])) + (source[:,:,1] * (source[:,:,3])))*255
-		final[:,:,2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255		
-		final[:,:,3] = ((destination[:,:,3] * (1-source[:,:,3])) + (source[:,:,3] * (source[:,:,3])))*255
-		layer[adj_y1:adj_y2, adj_x1:adj_x2] = final.astype(N.uint8)
+		final[:,:,2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255			
+		final[:,:,3] = (destination[:,:,3] + (1 - destination[:,:,3]) * source[:,:,3])*255;
+
+		layer[adj_y1:adj_y2, adj_x1:adj_x2, :] = N.copy(final.astype(N.uint8))
+	
+
+		if config.DEBUG:
+			print('dest:'+str(destination[0:1,0:1,3]))
+			print('source:'+str(source[0:1,0:1,3]))
+			print('final:'+str(final[0:1,0:1,3]))
+			print('layer:'+str(layer[0:1,0:1,3]))
+
+
+
 
 
 
