@@ -94,8 +94,8 @@ def rotateMatrix(pointList, cx, cy, angle):
 		length = math.sqrt((cx - oldX)**2 + (cy - oldY)**2)
 
 		#Rotate them and insert in the return list
-		newX = cx+length*dcos(direction+angle)
-		newY = cy+length*dsin(direction+angle)
+		newX = cx+length*dcos(direction+math.radians(angle))
+		newY = cy+length*dsin(direction+math.radians(angle))
 		rotatedPoints.append([newX, newY])
 	return rotatedPoints
 
