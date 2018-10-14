@@ -13,9 +13,9 @@ from blendModes import *
 
 '''
 TODO:
--add mirror fuzzy 
--add flood fill
-- double check alpha blending because there is still something wrong
+-add asserts to main functions
+-uniform the way in main.py we handle paynter and image
+-add color class
 
 '''
 
@@ -219,6 +219,13 @@ class Image:
 		self.layers.append(Layer(effect = effect))
 		self.activeLayer = len(self.layers)-1
 
+	#Duplicate the current layer
+	def duplicateActiveLayer(self):
+		activeLayer = self.layers[self.activeLayer]
+		newLayer = Layer(data=activeLayer.data, effect=activeLayer.effect)
+		self.layers.append(newLayer)
+		self.activeLayer = len(self.layers)-1
+
 	#Merge all the layers together to render the final image
 	def mergeAllLayers(self):
 		while(len(self.layers)>1):
@@ -264,6 +271,7 @@ class Paynter:
 	color = [0, 0, 0, 1]
 	secondColor = [1, 1, 1, 1]
 	image = 0
+	mirrorMode = '' # ''/'h'/'v'/'hv'
 
 	#Init the paynter
 	def __init__(self):
@@ -271,6 +279,11 @@ class Paynter:
 		config.CANVAS_SIZE = int(config.REAL_CANVAS_SIZE/config.DOWNSAMPLING)
 		self.image = Image()
 
+
+
+	######################################################################
+	# Level 0 Functions, needs downsampling
+	######################################################################
 	#Draw a line between two points
 	def drawLine(self, x1, y1, x2, y2):
 		#Downsample the coordinates
@@ -279,6 +292,7 @@ class Paynter:
 		y1 = int(y1/config.DOWNSAMPLING)
 		y2 = int(y2/config.DOWNSAMPLING)
 		print('drawing line from: '+str((x1,y1))+' to: '+str((x2,y2)))
+
 
 		#Calculate the direction and the length of the step
 		direction = math.degrees(math.atan2(y2 - y1, x2 - x1))
@@ -292,7 +306,7 @@ class Paynter:
 		#Do all the steps until I passed the target point
 		while(previousDist>currentDist):
 			#Make the dab on this point
-			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor)
+			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 
 			#Mode the point for the next step and update the distances
 			x += length*dcos(direction)
@@ -304,8 +318,11 @@ class Paynter:
 	def drawPoint(self, x, y):
 		x = int(x/config.DOWNSAMPLING)
 		y = int(y/config.DOWNSAMPLING)
-		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor)
+		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 
+	######################################################################
+	# Level 1 Functions, calls Level 0 functions, no downsampling
+	######################################################################
 	#Draw a path from a series of points
 	def drawPath(self, pointList):
 		self.drawLine(pointList[0][0], pointList[0][1], pointList[1][0], pointList[1][1])
@@ -337,6 +354,38 @@ class Paynter:
 		layer[:,:,2] = color[2]
 		layer[:,:,3] = color[3]
 
+	#Add border to image
+	def addBorder(self, width, color=0):
+		width = int(width/config.DOWNSAMPLING)
+		if color==0:
+			color = self.color
+		layer = self.image.getActiveLayer().data
+		layer[0:width,:,0] = color[0]
+		layer[0:width,:,1] = color[1]
+		layer[0:width,:,2] = color[2]
+		layer[0:width,:,3] = color[3]*255
+
+		layer[:,0:width,0] = color[0]
+		layer[:,0:width,1] = color[1]
+		layer[:,0:width,2] = color[2]
+		layer[:,0:width,3] = color[3]*255
+
+		layer[layer.shape[0]-width:layer.shape[0],:,0] = color[0]
+		layer[layer.shape[0]-width:layer.shape[0],:,1] = color[1]
+		layer[layer.shape[0]-width:layer.shape[0],:,2] = color[2]
+		layer[layer.shape[0]-width:layer.shape[0],:,3] = color[3]*255
+
+		layer[:,layer.shape[1]-width:layer.shape[1],0] = color[0]
+		layer[:,layer.shape[1]-width:layer.shape[1],1] = color[1]
+		layer[:,layer.shape[1]-width:layer.shape[1],2] = color[2]
+		layer[:,layer.shape[1]-width:layer.shape[1],3] = color[3]*255
+
+
+
+
+	######################################################################
+	# Setters and getters
+	######################################################################
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, r=0, g=0, b=0, a=255):
 		#Separated paramters
@@ -356,6 +405,11 @@ class Paynter:
 	def setBrush(self, b):
 		self.brush = b
 
+	#Setter for the mirror mode
+	def setMirrorMode(self, mirror):
+		assert (mirror=='' or mirror=='h' or mirror=='v' or mirror=='hv'), 'setMirrorMode: wrong mirror mode, got '+str(mirror)+' expected one of ["","h","v","hv"]'
+		self.mirrorMode = mirror
+		
 	#Render the final image
 	def renderImage(self):
 		#Make sure the alpha on the base layer is ok
@@ -368,6 +422,7 @@ class Paynter:
 		#Show the results
 		img = PIL.Image.fromarray(resultLayerData, 'RGBA')
 		img.show()
+
 
 
 
@@ -443,12 +498,7 @@ class Brush:
 			self.brushMask = 1-bm
 			
 
-
-	#Make a single dab on the canvas
-	def makeDab(self, layer, x, y, color, secondColor):
-		#Extract the layerData
-		layer = layer.data
-
+	def prepareDab(self, x, y, color, secondColor):
 		#Apply scattering if any
 		if self.fuzzyDabScatter != 0:
 			randomAngle = randInt(0,360)
@@ -457,12 +507,7 @@ class Brush:
 			y += dsin(randomAngle)*randomLength
 
 		#Round up all the coordinates and convert them to int 
-		x = int(round(x))
-		y = int(round(y))
-		if config.DEBUG:
-			print('-----------------------------')
-			print('make dab: '+str(x)+','+str(y) +' color :' +str(color))
-			print('layer: '+str(layer.shape))
+		x, y = int(x), int(y)
 
 		#Get the brush image image 
 		brushSource = 0
@@ -515,58 +560,84 @@ class Brush:
 			#Convert back to rgb
 			dabColor[:3] = hsv2rgb(hsv)
 
-		#Get the final dab size
-		dabSizeX = brushSource.shape[0]
-		dabSizeY = brushSource.shape[1]
+		#Color the brush
+		coloredBrushSource = brushSource[:,:] * dabColor
+		
+		#Return the processed dab
+		return {
+			'x' : x,
+			'y' : y,
+			'coloredBrushSource' : coloredBrushSource
+		}
+
+	#Stamp the processed dab onto the canvas
+	def applyDab(self, layer, x, y, source):
+		#Extract layerdata
+		layerData = layer.data
 		if config.DEBUG:
-			print('dabSize:'+str(dabSizeX)+" ; "+str(dabSizeY)+' canvas:'+str(config.CANVAS_SIZE))
+			print('layer: '+str(layerData.shape))
+
+		#Get the final dab size
+		dabSizeX, dabSizeY = source.shape[:2]
+		if config.DEBUG:print('dabSize:'+str(dabSizeX)+" ; "+str(dabSizeY)+' canvas:'+str(config.CANVAS_SIZE))
 
 		#Adjust coordinates and make sure we are inside (at least partially) the canvas
 		adj_x1, adj_y1 = clamp(x,          0, config.CANVAS_SIZE), clamp(y,          0, config.CANVAS_SIZE)
 		adj_x2, adj_y2 = clamp(x+dabSizeX, 0, config.CANVAS_SIZE), clamp(y+dabSizeY, 0, config.CANVAS_SIZE)
-		if adj_x1==adj_x2 or adj_y1==adj_y2:
-			return
+		if adj_x1==adj_x2 or adj_y1==adj_y2:return
 
 		#Get the slice and uniform to [0-1]
-		destination = N.copy(layer[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32))
-		destination /= 255
+		destination = N.copy(layerData[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32))
+		destination = N.divide(destination, 255)
 
 		#Calculate the correct range to make sure it works even on canvas border 
 		bx1 = 0 if (x>=0) else dabSizeX-adj_x2
 		bx2 = bx1+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
 		by1 = 0 if (y>=0) else dabSizeY-adj_y2
 		by2 = by1+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
-		if config.DEBUG:
-			print('brush/layer     ['+str(adj_y1)+":"+str(adj_y2)+','+str(adj_x1)+":"+str(adj_x2)+"]")
-			print('source = source ['+str(by1)+":"+str(by2)+','+str(bx1)+":"+str(bx2)+"]")
+		if config.DEBUG:print('brush/layer     ['+str(adj_y1)+":"+str(adj_y2)+','+str(adj_x1)+":"+str(adj_x2)+"]"+'\nsource = source ['+str(by1)+":"+str(by2)+','+str(bx1)+":"+str(bx2)+"]")
 
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
-		source = brushSource[:,:] * dabColor
 		source = source[by1:by2, bx1:bx2, :]
-		if config.DEBUG:
-			print('source shape :'+str(source.shape))
-			print('desti  shape :'+str(destination.shape))
+		if config.DEBUG:print('source shape :'+str(source.shape)+'\ndesti  shape :'+str(destination.shape))
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
 
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
-		final = N.zeros((adj_y2-adj_y1, adj_x2-adj_x1, 4), dtype=N.float32)
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = ((destination[:,:,1] * (1-source[:,:,3])) + (source[:,:,1] * (source[:,:,3])))*255
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255			
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = (destination[:,:,3] + (1 - destination[:,:,3]) * source[:,:,3])*255;
+		if config.DEBUG:print('dest:'+str(destination[0:1,0:1,3])+'\nsource:'+str(source[0:1,0:1,3])+'\nfinal:'+str(final[0:1,0:1,3])+'\nlayer:'+str(layer[0:1,0:1,3])+'\n-----------------------------')
+
+
+
+	#Make a single dab on the canvas
+	def makeDab(self, layer, x, y, color, secondColor, mirror=''):
 		if config.DEBUG:
-			print('final  shape :'+str(final.shape))
 			print('-----------------------------')
+			print('make dab: '+str(x)+','+str(y) +' color :' +str(color))
+		
+		#Prepare the dab with all the fuzzy parameters 
+		dabProperties = self.prepareDab(x, y, color, secondColor)		
+		x = dabProperties['x']
+		y = dabProperties['y']
+		coloredBrushSource = dabProperties['coloredBrushSource']
 
-		final[:,:,0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255
-		final[:,:,1] = ((destination[:,:,1] * (1-source[:,:,3])) + (source[:,:,1] * (source[:,:,3])))*255
-		final[:,:,2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255			
-		final[:,:,3] = (destination[:,:,3] + (1 - destination[:,:,3]) * source[:,:,3])*255;
+		#Apply the preprocessed dab onto the canvas with mirrors
+		self.applyDab(layer, x, y, coloredBrushSource)
+		if mirror=='h' or mirror=='hv':
+			brushSourceFlipped = N.fliplr(N.copy(coloredBrushSource))
+			self.applyDab(layer, layer.data.shape[0]-x-brushSourceFlipped.shape[0], y, brushSourceFlipped)
+		if mirror=='v' or mirror=='hv':
+			brushSourceFlipped = N.flipud(N.copy(coloredBrushSource))
+			self.applyDab(layer, x, layer.data.shape[1]-y-coloredBrushSource.shape[1], brushSourceFlipped)
+		if mirror=='hv':
+			brushSourceFlipped = N.fliplr(N.copy(coloredBrushSource))
+			brushSourceFlippedFlipped = N.flipud(N.copy(brushSourceFlipped))
+			self.applyDab(layer, layer.data.shape[0]-x-brushSourceFlippedFlipped.shape[0], layer.data.shape[1]-y-brushSourceFlippedFlipped.shape[1], brushSourceFlippedFlipped)
 
-		layer[adj_y1:adj_y2, adj_x1:adj_x2, :] = N.copy(final.astype(N.uint8))
-	
 
-		if config.DEBUG:
-			print('dest:'+str(destination[0:1,0:1,3]))
-			print('source:'+str(source[0:1,0:1,3]))
-			print('final:'+str(final[0:1,0:1,3]))
-			print('layer:'+str(layer[0:1,0:1,3]))
+
 
 
 
