@@ -14,9 +14,9 @@ image = paynter.image
 
 #Create a palette
 palette = getColors_Triad(spread = 20)
-palette[0] = tweakColorVal(palette[0], -0.9)
-palette[1] = tweakColorSat(palette[1], -0.65)
-palette[2] = tweakColorSat(palette[2], -0.65)
+palette[0].tweak_Val(-0.9)
+palette[1].tweak_Sat(-0.65)
+palette[2].tweak_Sat(-0.65)
 
 #Create the brushes
 pencil = Brush( "gradient.png", "paperGrain.png", size=50, angle=45, spacing=0.02)

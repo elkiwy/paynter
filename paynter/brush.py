@@ -5,7 +5,7 @@ import numpy as N
 #PaYnter Modules
 import paynter.config as config
 from .utils import *
-
+from .color import *
 
 
 ######################################################################
@@ -52,13 +52,15 @@ class Brush:
 	fuzzyDabMix = 0
 	fuzzyDabScatter = 0
 	originalSpacing = 0
+	originalSize = 0
 
 	#Create the brush
 	def __init__(self, tipImage, maskImage, size = 50, 
-				color = [0,0,0,0], angle = 0, spacing = 1, 
+				angle = 0, spacing = 1, 
 				fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0, fuzzyDabVal = 0, fuzzyDabMix = 0,
 				fuzzyDabScatter = 0):
 		#Downsample the size-related parameters
+		self.originalSize = size
 		size = int(size/config.DOWNSAMPLING)
 		if fuzzyDabScatter!=0:
 			fuzzyDabScatter[0] = int(fuzzyDabScatter[0]/config.DOWNSAMPLING)
@@ -107,6 +109,10 @@ class Brush:
 
 
 	def resizeBrush(self, newSize):
+		if newSize==0:
+			newSize = self.originalSize
+		print('resizing to :'+str(newSize))
+
 		#Downsample the size-related parameters
 		newSize = int(newSize/config.DOWNSAMPLING)
 
@@ -169,33 +175,27 @@ class Brush:
 			brushSource = N.array(img)/255
 
 		#Apply fuzzy color transformations
-		dabColor = N.copy(color)
+		dabColor = color.copy()
 		if self.fuzzyDabHue!=0 or self.fuzzyDabSat!=0 or self.fuzzyDabVal!=0 or self.fuzzyDabMix!=0:
 			#Mix colors
 			if self.fuzzyDabMix!=0:
 				fuz = fuzzy(self.fuzzyDabMix)
-				dabColor[0] = min(1, (dabColor[0]*(1-fuz) + secondColor[0]*fuz))
-				dabColor[1] = min(1, (dabColor[1]*(1-fuz) + secondColor[1]*fuz))
-				dabColor[2] = min(1, (dabColor[2]*(1-fuz) + secondColor[2]*fuz))
+				dabColor.r = min(1, (dabColor.r*(1-fuz) + secondColor.r*fuz))
+				dabColor.g = min(1, (dabColor.g*(1-fuz) + secondColor.g*fuz))
+				dabColor.b = min(1, (dabColor.b*(1-fuz) + secondColor.b*fuz))
 				
-			#Convert to hsv
-			hsv = rgb2hsv(dabColor[:3])
-
 			#Fuzzy Hue
 			if self.fuzzyDabHue!=0:
-				hsv[0] = (hsv[0] + fuzzy(self.fuzzyDabHue)) % 1
+				dabColor.tweak_Hue(fuzzy(self.fuzzyDabHue))
 			#Fuzzy Saturation
 			if self.fuzzyDabSat!=0:
-				hsv[1] = clamp(hsv[1] + fuzzy(self.fuzzyDabSat), 0, 1)
+				dabColor.tweak_Sat(fuzzy(self.fuzzyDabSat))
 			#Fuzzy Value
 			if self.fuzzyDabVal!=0:
-				hsv[2] = clamp(hsv[2] + fuzzy(self.fuzzyDabVal), 0, 1)
-
-			#Convert back to rgb
-			dabColor[:3] = hsv2rgb(hsv)
+				dabColor.tweak_Val(fuzzy(self.fuzzyDabVal))
 
 		#Color the brush
-		coloredBrushSource = brushSource[:,:] * dabColor
+		coloredBrushSource = brushSource[:,:] * dabColor.get_0_1()
 		
 		#Return the processed dab
 		return {

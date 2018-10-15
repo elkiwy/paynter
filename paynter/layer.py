@@ -6,6 +6,7 @@ import PIL.ImageFont
 
 #PaYnter Modules
 import paynter.config as config
+from .color import Color
 
 ######################################################################
 # Layer Functions
@@ -16,13 +17,17 @@ class Layer:
 	data = 0
 
 	#Layer constructor
-	def __init__(self, data = None, color = [255,255,255,0], effect = ''):
+	# Layers data structure are always 0-255 ints
+	def __init__(self, data = None, color = None, effect = ''):
 		if type(data) is not N.ndarray:
 			self.data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
-			self.data[:,:,0] = color[0]
-			self.data[:,:,1] = color[1]
-			self.data[:,:,2] = color[2]
-			self.data[:,:,3] = color[3]
+			if color==None:
+				color = Color([1,1,1,0], '0-1')
+			colorRGBA = color.get_0_255()
+			self.data[:,:,0] = colorRGBA[0]
+			self.data[:,:,1] = colorRGBA[1]
+			self.data[:,:,2] = colorRGBA[2]
+			self.data[:,:,3] = colorRGBA[3]
 		else:
 			self.data = data
 		self.effect = effect

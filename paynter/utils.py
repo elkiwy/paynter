@@ -10,14 +10,6 @@ import colorsys
 # Useful Functions
 ######################################################################
 
-#Take 0-1 hsv and outputs a 0-1 rgb
-def hsv2rgb(hsv):
-    return N.asarray(colorsys.hsv_to_rgb(hsv[0],hsv[1],hsv[2]))
-
-#Take 0-1 rgb and outputs 0-1 hsv
-def rgb2hsv(rgb):
-    return N.asarray(colorsys.rgb_to_hsv(rgb[0],rgb[1],rgb[2]))
-
 #Clamp shortcut
 def clamp(x, mi, ma):
 	return max(mi, min(ma, x))

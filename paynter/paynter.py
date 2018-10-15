@@ -30,8 +30,8 @@ TODO:
 class Paynter:
 	brush = 0
 	layer = 0
-	color = [0, 0, 0, 1]
-	secondColor = [1, 1, 1, 1]
+	color = Color([0, 0, 0, 1], '0-1')
+	secondColor = Color([1, 1, 1, 1], '0-1')
 	image = 0
 	mirrorMode = '' # ''/'h'/'v'/'hv'
 
@@ -111,36 +111,38 @@ class Paynter:
 	#Fill the current layer with a color
 	def fillLayerWithColor(self, color):
 		layer = self.image.getActiveLayer().data
-		layer[:,:,0] = color[0]
-		layer[:,:,1] = color[1]
-		layer[:,:,2] = color[2]
-		layer[:,:,3] = color[3]
+		colorRGBA = color.get_0_255()
+		layer[:,:,0] = colorRGBA[0]
+		layer[:,:,1] = colorRGBA[1]
+		layer[:,:,2] = colorRGBA[2]
+		layer[:,:,3] = colorRGBA[3]
 
 	#Add border to image
-	def addBorder(self, width, color=0):
+	def addBorder(self, width, color=None):
 		width = int(width/config.DOWNSAMPLING)
-		if color==0:
+		if color==None:
 			color = self.color
 		layer = self.image.getActiveLayer().data
-		layer[0:width,:,0] = color[0]
-		layer[0:width,:,1] = color[1]
-		layer[0:width,:,2] = color[2]
-		layer[0:width,:,3] = color[3]*255
+		colorRGBA = color.get_0_255()
+		layer[0:width,:,0] = colorRGBA[0]
+		layer[0:width,:,1] = colorRGBA[1]
+		layer[0:width,:,2] = colorRGBA[2]
+		layer[0:width,:,3] = colorRGBA[3]*255
 
-		layer[:,0:width,0] = color[0]
-		layer[:,0:width,1] = color[1]
-		layer[:,0:width,2] = color[2]
-		layer[:,0:width,3] = color[3]*255
+		layer[:,0:width,0] = colorRGBA[0]
+		layer[:,0:width,1] = colorRGBA[1]
+		layer[:,0:width,2] = colorRGBA[2]
+		layer[:,0:width,3] = colorRGBA[3]*255
 
-		layer[layer.shape[0]-width:layer.shape[0],:,0] = color[0]
-		layer[layer.shape[0]-width:layer.shape[0],:,1] = color[1]
-		layer[layer.shape[0]-width:layer.shape[0],:,2] = color[2]
-		layer[layer.shape[0]-width:layer.shape[0],:,3] = color[3]*255
+		layer[layer.shape[0]-width:layer.shape[0],:,0] = colorRGBA[0]
+		layer[layer.shape[0]-width:layer.shape[0],:,1] = colorRGBA[1]
+		layer[layer.shape[0]-width:layer.shape[0],:,2] = colorRGBA[2]
+		layer[layer.shape[0]-width:layer.shape[0],:,3] = colorRGBA[3]*255
 
-		layer[:,layer.shape[1]-width:layer.shape[1],0] = color[0]
-		layer[:,layer.shape[1]-width:layer.shape[1],1] = color[1]
-		layer[:,layer.shape[1]-width:layer.shape[1],2] = color[2]
-		layer[:,layer.shape[1]-width:layer.shape[1],3] = color[3]*255
+		layer[:,layer.shape[1]-width:layer.shape[1],0] = colorRGBA[0]
+		layer[:,layer.shape[1]-width:layer.shape[1],1] = colorRGBA[1]
+		layer[:,layer.shape[1]-width:layer.shape[1],2] = colorRGBA[2]
+		layer[:,layer.shape[1]-width:layer.shape[1],3] = colorRGBA[3]*255
 
 
 
@@ -149,22 +151,18 @@ class Paynter:
 	# Setters and getters
 	######################################################################
 	#Setter for color, takes 0-255 RGBA
-	def setColor(self, r=0, g=0, b=0, a=255):
-		#Separated paramters
-		if isinstance(r, int):
-			self.color = N.divide([r, g, b, a], 255)
-		#RGBA list 
-		else:
-			self.color = N.divide([r[0], r[1], r[2], r[3]], 255)
+	def setColor(self, color):
+		self.color = color
 
 	#Swap between first and second color
 	def swapColors(self):
-		temp = N.copy(self.color)
+		rgba = self.color.get_0_255()
 		self.color = self.secondColor
-		self.secondColor = temp
+		self.secondColor = Color(rgba, '0-255')
 
 	#Setter for brush reference
-	def setBrush(self, b):
+	def setBrush(self, b, resize=0):
+		b.resizeBrush(resize) #If resize=0 it reset to its default size
 		self.brush = b
 
 	#Setter for the mirror mode
