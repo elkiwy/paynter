@@ -1,6 +1,6 @@
 #PaYnter Modules
 from paynter import *
-import config
+import paynter.config as config
 
 
 #Setup config
@@ -44,18 +44,24 @@ paynter.drawLine(100,300,500,400)
 
 
 
+paynter.setMirrorMode('hv')
+
 pointList = []
-pointList.append([300,300])
-pointList.append([400,300])
-pointList.append([400,400])
-pointList.append([300,400])
-pointList.append([300,300])
+pointList.append([300,500])
+pointList.append([400,500])
+pointList.append([400,600])
+pointList.append([300,600])
+pointList.append([300,500])
 paynter.drawPath(pointList)
+paynter.drawRect(500, 500, 600, 600)
+paynter.drawRect(700, 500, 800, 600, 30)
 
-paynter.drawRect(500, 300, 600, 400)
 
-paynter.drawRect(700, 300, 800, 400, 45)
-
+image.newLayer(effect='overlay')
+paynter.setColor(palette[0])
+paynter.addBorder(30)
+image.duplicateActiveLayer()
+image.duplicateActiveLayer()
 
 
 

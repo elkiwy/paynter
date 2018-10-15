@@ -44,6 +44,7 @@ def fuzzy(fuzzyRange):
 
 #Rotate a list of points around a center for an angle
 def rotateMatrix(pointList, cx, cy, angle):
+	
 	rotatedPoints = []
 	#For each point in the list
 	for point in pointList:
@@ -54,8 +55,13 @@ def rotateMatrix(pointList, cx, cy, angle):
 		length = math.sqrt((cx - oldX)**2 + (cy - oldY)**2)
 
 		#Rotate them and insert in the return list
-		newX = cx+length*dcos(direction+math.radians(angle))
-		newY = cy+length*dsin(direction+math.radians(angle))
+		newX = cx+length*dcos(direction+angle)
+		newY = cy+length*dsin(direction+angle)
 		rotatedPoints.append([newX, newY])
 	return rotatedPoints
 
+#Interpolate two points (pos=0 -> returns x1,y1; pos=1 -> return x2,y2)
+def linearInterpolationPoint(x1,y1,x2,y2, pos):
+    xx = x1+pos*(x2-x1)
+    yy = y1+pos*(y2-y1)
+    return (xx,yy)

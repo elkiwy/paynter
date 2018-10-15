@@ -51,6 +51,7 @@ class Brush:
 	fuzzyDabVal = 0
 	fuzzyDabMix = 0
 	fuzzyDabScatter = 0
+	originalSpacing = 0
 
 	#Create the brush
 	def __init__(self, tipImage, maskImage, size = 50, 
@@ -79,6 +80,7 @@ class Brush:
 		
 		#Set the perameters
 		self.spacing = size*spacing
+		self.originalSpacing = spacing
 		self.fuzzyDabAngle = fuzzyDabAngle
 		self.fuzzyDabSize = fuzzyDabSize
 		self.fuzzyDabHue = fuzzyDabHue
@@ -102,6 +104,32 @@ class Brush:
 			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			bm[:,:] = 0
 			self.brushMask = 1-bm
+
+
+	def resizeBrush(self, newSize):
+		#Downsample the size-related parameters
+		newSize = int(newSize/config.DOWNSAMPLING)
+
+		#Set the brushTip
+		if self.multibrush:
+			#Multibrush
+			for i in range(0,len(self.brushTip)):
+				btImg = PIL.Image.fromarray((self.brushTip[i]*255).astype(N.uint8), 'RGBA')
+				btImgScaled = btImg.resize((newSize, newSize), resample=resizeResample)
+				btArray = N.divide(N.array(btImgScaled).astype(N.float32), 255)
+				self.brushTip[i] = btArray
+			self.brushSize = self.brushTip[0].shape[0]
+		else:
+			#NormalBrush
+			btImg = PIL.Image.fromarray((self.brushTip*255).astype(N.uint8), 'RGBA')
+			btImgScaled = btImg.resize((newSize, newSize), resample=resizeResample)
+			btArray = N.divide(N.array(btImgScaled).astype(N.float32), 255)
+			self.brushTip = btArray
+			self.brushSize = self.brushTip.shape[0]
+		
+		#Set the perameters
+		self.spacing = newSize*self.originalSpacing
+
 			
 
 	def prepareDab(self, x, y, color, secondColor):
@@ -113,7 +141,7 @@ class Brush:
 			y += dsin(randomAngle)*randomLength
 
 		#Round up all the coordinates and convert them to int 
-		x, y = int(x), int(y)
+		x, y = int(x-self.brushSize*0.5), int(y-self.brushSize*0.5)
 
 		#Get the brush image image 
 		brushSource = 0
