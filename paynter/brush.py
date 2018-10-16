@@ -53,6 +53,7 @@ class Brush:
 	fuzzyDabScatter = 0
 	originalSpacing = 0
 	originalSize = 0
+	realCurrentSize = 0
 
 	#Create the brush
 	def __init__(self, tipImage, maskImage, size = 50, 
@@ -61,6 +62,7 @@ class Brush:
 				fuzzyDabScatter = 0):
 		#Downsample the size-related parameters
 		self.originalSize = size
+		self.realCurrentSize = size
 		size = int(size/config.DOWNSAMPLING)
 		if fuzzyDabScatter!=0:
 			fuzzyDabScatter[0] = int(fuzzyDabScatter[0]/config.DOWNSAMPLING)
@@ -111,7 +113,12 @@ class Brush:
 	def resizeBrush(self, newSize):
 		if newSize==0:
 			newSize = self.originalSize
-		print('resizing to :'+str(newSize))
+
+		if self.realCurrentSize == newSize:
+			return
+
+		print('resizing from :'+str(self.realCurrentSize)+' to:'+str(newSize))
+		self.realCurrentSize = newSize
 
 		#Downsample the size-related parameters
 		newSize = int(newSize/config.DOWNSAMPLING)

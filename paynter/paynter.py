@@ -124,31 +124,32 @@ class Paynter:
 			color = self.color
 		layer = self.image.getActiveLayer().data
 		colorRGBA = color.get_0_255()
+		print('adding border'+str(colorRGBA)+str(width)+str(layer.shape))
 		layer[0:width,:,0] = colorRGBA[0]
 		layer[0:width,:,1] = colorRGBA[1]
 		layer[0:width,:,2] = colorRGBA[2]
-		layer[0:width,:,3] = colorRGBA[3]*255
+		layer[0:width,:,3] = colorRGBA[3]
 
 		layer[:,0:width,0] = colorRGBA[0]
 		layer[:,0:width,1] = colorRGBA[1]
 		layer[:,0:width,2] = colorRGBA[2]
-		layer[:,0:width,3] = colorRGBA[3]*255
+		layer[:,0:width,3] = colorRGBA[3]
 
 		layer[layer.shape[0]-width:layer.shape[0],:,0] = colorRGBA[0]
 		layer[layer.shape[0]-width:layer.shape[0],:,1] = colorRGBA[1]
 		layer[layer.shape[0]-width:layer.shape[0],:,2] = colorRGBA[2]
-		layer[layer.shape[0]-width:layer.shape[0],:,3] = colorRGBA[3]*255
+		layer[layer.shape[0]-width:layer.shape[0],:,3] = colorRGBA[3]
 
 		layer[:,layer.shape[1]-width:layer.shape[1],0] = colorRGBA[0]
 		layer[:,layer.shape[1]-width:layer.shape[1],1] = colorRGBA[1]
 		layer[:,layer.shape[1]-width:layer.shape[1],2] = colorRGBA[2]
-		layer[:,layer.shape[1]-width:layer.shape[1],3] = colorRGBA[3]*255
+		layer[:,layer.shape[1]-width:layer.shape[1],3] = colorRGBA[3]
 
 
 
 
 	######################################################################
-	# Setters and getters
+	# Setters, getters, and more
 	######################################################################
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, color):
@@ -171,7 +172,7 @@ class Paynter:
 		self.mirrorMode = mirror
 		
 	#Render the final image
-	def renderImage(self):
+	def renderImage(self, output=''):
 		#Make sure the alpha on the base layer is ok
 		#self.image.layers[0].data[:,:,3] = 255
 
@@ -182,6 +183,24 @@ class Paynter:
 		#Show the results
 		img = PIL.Image.fromarray(resultLayerData, 'RGBA')
 		img.show()
+
+		if output!='':
+			img.save(output, 'PNG')
+
+	#Shortcut for image operations
+	def newLayer(self, effect=''):
+		self.image.newLayer(effect)
+
+	#Shortcut for image operations
+	def setActiveLayerEffect(self, effect):
+		self.image.layers[self.image.activeLayer].effect = effect
+
+	#Shortcut for image operations
+	def duplicateActiveLayer(self):
+		self.image.duplicateActiveLayer()
+
+
+
 
 
 
