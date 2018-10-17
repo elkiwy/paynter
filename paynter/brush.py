@@ -2,11 +2,13 @@
 import PIL.Image
 import numpy as N
 
+
 #PaYnter Modules
 import paynter.config as config
 from .utils import *
 from .color import *
 
+import time
 
 ######################################################################
 # Brush class
@@ -213,51 +215,52 @@ class Brush:
 
 	#Stamp the processed dab onto the canvas
 	def applyDab(self, layer, x, y, source):
+
+		startingTime = time.time()
+		
 		#Extract layerdata
 		layerData = layer.data
-		if config.DEBUG:
-			print('layer: '+str(layerData.shape))
 
 		#Get the final dab size
 		dabSizeX, dabSizeY = source.shape[:2]
-		if config.DEBUG:print('dabSize:'+str(dabSizeX)+" ; "+str(dabSizeY)+' canvas:'+str(config.CANVAS_SIZE))
-
+		
 		#Adjust coordinates and make sure we are inside (at least partially) the canvas
 		adj_x1, adj_y1 = clamp(x,          0, config.CANVAS_SIZE), clamp(y,          0, config.CANVAS_SIZE)
 		adj_x2, adj_y2 = clamp(x+dabSizeX, 0, config.CANVAS_SIZE), clamp(y+dabSizeY, 0, config.CANVAS_SIZE)
 		if adj_x1==adj_x2 or adj_y1==adj_y2:return
-
+		
 		#Get the slice and uniform to [0-1]
-		destination = N.copy(layerData[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32))
-		destination = N.divide(destination, 255)
-
+		destination = N.divide(N.copy(layerData[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)), 255)
+		
 		#Calculate the correct range to make sure it works even on canvas border 
 		bx1 = 0 if (x>=0) else dabSizeX-adj_x2
 		bx2 = bx1+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
 		by1 = 0 if (y>=0) else dabSizeY-adj_y2
 		by2 = by1+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
-		if config.DEBUG:print('brush/layer     ['+str(adj_y1)+":"+str(adj_y2)+','+str(adj_x1)+":"+str(adj_x2)+"]"+'\nsource = source ['+str(by1)+":"+str(by2)+','+str(bx1)+":"+str(bx2)+"]")
-
+		
 		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
 		source = source[by1:by2, bx1:bx2, :]
-		if config.DEBUG:print('source shape :'+str(source.shape)+'\ndesti  shape :'+str(destination.shape))
 		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
-
+		
 		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 0] = ((destination[:,:,0] * (1-source[:,:,3])) + (source[:,:,0] * (source[:,:,3])))*255
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = ((destination[:,:,1] * (1-source[:,:,3])) + (source[:,:,1] * (source[:,:,3])))*255
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = ((destination[:,:,2] * (1-source[:,:,3])) + (source[:,:,2] * (source[:,:,3])))*255			
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = (destination[:,:,3] + (1 - destination[:,:,3]) * source[:,:,3])*255;
-		if config.DEBUG:print('dest:'+str(destination[0:1,0:1,3])+'\nsource:'+str(source[0:1,0:1,3])+'\nfinal:'+str(final[0:1,0:1,3])+'\nlayer:'+str(layer[0:1,0:1,3])+'\n-----------------------------')
+		inverseSource = 1-source[:,:,3]
+		normalSource = source[:,:,3]
 
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 0] = ((destination[:,:,0] * (inverseSource)) + (source[:,:,0] * normalSource))*255
+		print('Time8: '+str(time.time()-startingTime))
 
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = ((destination[:,:,1] * (inverseSource)) + (source[:,:,1] * normalSource))*255
+		print('Time9: '+str(time.time()-startingTime))
 
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = ((destination[:,:,2] * (inverseSource)) + (source[:,:,2] * normalSource))*255			
+		print('Time10: '+str(time.time()-startingTime))
+
+		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = (destination[:,:,3] + (1 - destination[:,:,3]) * normalSource)*255;
+		print('Time11: '+str(time.time()-startingTime))
+		print('-------')
+		
 	#Make a single dab on the canvas
 	def makeDab(self, layer, x, y, color, secondColor, mirror=''):
-		if config.DEBUG:
-			print('-----------------------------')
-			print('make dab: '+str(x)+','+str(y) +' color :' +str(color))
-		
 		#Prepare the dab with all the fuzzy parameters 
 		dabProperties = self.prepareDab(x, y, color, secondColor)		
 		x = dabProperties['x']
