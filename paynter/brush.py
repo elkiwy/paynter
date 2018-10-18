@@ -98,6 +98,9 @@ class Brush:
 		#Set the brush mask
 		if maskImage!="":
 			res = PIL.Image.open(config.ROOT+'/res/'+maskImage)
+			while res.width>config.CANVAS_SIZE:
+				res = res.resize((int(res.width/2),int(res.width/2)), resample=resizeResample)
+
 			alpha = res.split()[0] #Take only the red channel since is black and white
 			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			for j in range(0, config.CANVAS_SIZE, res.width):
@@ -147,17 +150,7 @@ class Brush:
 
 			
 
-	def prepareDab(self, x, y, color, secondColor):
-		#Apply scattering if any
-		if self.fuzzyDabScatter != 0:
-			randomAngle = randInt(0,360)
-			randomLength = fuzzy(self.fuzzyDabScatter)
-			x += dcos(randomAngle)*randomLength
-			y += dsin(randomAngle)*randomLength
-
-		#Round up all the coordinates and convert them to int 
-		x, y = int(x-self.brushSize*0.5), int(y-self.brushSize*0.5)
-
+	def prepareDab(self, color, secondColor):
 		#Get the brush image image 
 		brushSource = 0
 		if self.multibrush:
@@ -204,20 +197,11 @@ class Brush:
 				dabColor.tweak_Val(fuzzy(self.fuzzyDabVal))
 
 		#Color the brush
-		coloredBrushSource = brushSource[:,:] * dabColor.get_0_1()
-		
-		#Return the processed dab
-		return {
-			'x' : x,
-			'y' : y,
-			'coloredBrushSource' : coloredBrushSource
-		}
+		return brushSource[:,:] * dabColor.get_0_1()
 
 	#Stamp the processed dab onto the canvas
 	def applyDab(self, layer, x, y, source):
 
-		startingTime = time.time()
-		
 		#Extract layerdata
 		layerData = layer.data
 
@@ -247,26 +231,25 @@ class Brush:
 		normalSource = source[:,:,3]
 
 		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 0] = ((destination[:,:,0] * (inverseSource)) + (source[:,:,0] * normalSource))*255
-		print('Time8: '+str(time.time()-startingTime))
-
 		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = ((destination[:,:,1] * (inverseSource)) + (source[:,:,1] * normalSource))*255
-		print('Time9: '+str(time.time()-startingTime))
-
 		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = ((destination[:,:,2] * (inverseSource)) + (source[:,:,2] * normalSource))*255			
-		print('Time10: '+str(time.time()-startingTime))
-
 		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = (destination[:,:,3] + (1 - destination[:,:,3]) * normalSource)*255;
-		print('Time11: '+str(time.time()-startingTime))
-		print('-------')
 		
 	#Make a single dab on the canvas
 	def makeDab(self, layer, x, y, color, secondColor, mirror=''):
 		#Prepare the dab with all the fuzzy parameters 
-		dabProperties = self.prepareDab(x, y, color, secondColor)		
-		x = dabProperties['x']
-		y = dabProperties['y']
-		coloredBrushSource = dabProperties['coloredBrushSource']
+		coloredBrushSource = self.prepareDab(color, secondColor)		
 
+		#Apply scattering if any
+		if self.fuzzyDabScatter != 0:
+			randomAngle = randInt(0,360)
+			randomLength = fuzzy(self.fuzzyDabScatter)
+			x += dcos(randomAngle)*randomLength
+			y += dsin(randomAngle)*randomLength
+		
+		#Round up all the coordinates and convert them to int 
+		x, y = int(x-self.brushSize*0.5), int(y-self.brushSize*0.5)
+		
 		#Apply the preprocessed dab onto the canvas with mirrors
 		self.applyDab(layer, x, y, coloredBrushSource)
 		if mirror=='h' or mirror=='hv':

@@ -5,6 +5,8 @@
 # Remove main.py from repo
 main.py
 helper.py
+provola*
+paynterTensor/
 
 
 
