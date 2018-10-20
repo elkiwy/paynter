@@ -15,12 +15,15 @@ from .layer import *
 import paynter.config as config
 
 
+import time
+
 
 '''
 TODO:
 -add asserts to main functions
 -uniform the way in main.py we handle paynter and image
 -add color class
+-double check brush color alpha
 '''
 
 ######################################################################
@@ -30,8 +33,8 @@ TODO:
 class Paynter:
 	brush = 0
 	layer = 0
-	color = Color([0, 0, 0, 1], '0-1')
-	secondColor = Color([1, 1, 1, 1], '0-1')
+	color = Color(0, 0, 0, 1)
+	secondColor = Color(1,1,1,1)
 	image = 0
 	mirrorMode = '' # ''/'h'/'v'/'hv'
 
@@ -80,8 +83,11 @@ class Paynter:
 	def drawPoint(self, x, y):
 		x = int(x/config.DOWNSAMPLING)
 		y = int(y/config.DOWNSAMPLING)
-		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 
+		start = time.time()
+		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
+		config.AVGTIME.append(time.time()-start)
+		
 	######################################################################
 	# Level 1 Functions, calls Level 0 functions, no downsampling
 	######################################################################
@@ -154,6 +160,9 @@ class Paynter:
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, color):
 		self.color = color
+
+	def setColorAlpha(self, alpha):
+		self.color.set_alpha(alpha)
 
 	#Swap between first and second color
 	def swapColors(self):

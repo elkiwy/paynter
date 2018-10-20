@@ -9,3 +9,4 @@ REAL_CANVAS_SIZE = 0
 ROOT = os.path.dirname(os.path.dirname(__file__))
 
 
+AVGTIME = []

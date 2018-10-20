@@ -1,12 +1,13 @@
 #External modules
 import PIL.Image
 import numpy as N
-
+from numba import guvectorize, vectorize, jit, int32, float32, int64, float64, uint8, void
 
 #PaYnter Modules
 import paynter.config as config
 from .utils import *
 from .color import *
+from .jitted import *
 
 import time
 
@@ -149,7 +150,7 @@ class Brush:
 		self.spacing = newSize*self.originalSpacing
 
 			
-
+.class_type.instance_type
 	def prepareDab(self, color, secondColor):
 		#Get the brush image image 
 		brushSource = 0
@@ -174,7 +175,7 @@ class Brush:
 				img = img.resize((int(img.width*fuz), int(img.height*fuz)), resample=resizeResample)
 			
 			#Reconvert brushSource to an array
-			brushSource = N.array(img)/255
+			brushSource = N.array(img, dtype=N.float32)/255
 
 		#Apply fuzzy color transformations
 		dabColor = color.copy()
@@ -199,47 +200,10 @@ class Brush:
 		#Color the brush
 		return brushSource[:,:] * dabColor.get_0_1()
 
-	#Stamp the processed dab onto the canvas
-	def applyDab(self, layer, x, y, source):
-
-		#Extract layerdata
-		layerData = layer.data
-
-		#Get the final dab size
-		dabSizeX, dabSizeY = source.shape[:2]
-		
-		#Adjust coordinates and make sure we are inside (at least partially) the canvas
-		adj_x1, adj_y1 = clamp(x,          0, config.CANVAS_SIZE), clamp(y,          0, config.CANVAS_SIZE)
-		adj_x2, adj_y2 = clamp(x+dabSizeX, 0, config.CANVAS_SIZE), clamp(y+dabSizeY, 0, config.CANVAS_SIZE)
-		if adj_x1==adj_x2 or adj_y1==adj_y2:return
-		
-		#Get the slice and uniform to [0-1]
-		destination = N.divide(N.copy(layerData[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)), 255)
-		
-		#Calculate the correct range to make sure it works even on canvas border 
-		bx1 = 0 if (x>=0) else dabSizeX-adj_x2
-		bx2 = bx1+dabSizeX if (x+dabSizeX<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_x1
-		by1 = 0 if (y>=0) else dabSizeY-adj_y2
-		by2 = by1+dabSizeY if (y+dabSizeY<config.CANVAS_SIZE) else config.CANVAS_SIZE - adj_y1
-		
-		#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
-		source = source[by1:by2, bx1:bx2, :]
-		source[:, :, 3] *= self.brushMask[adj_y1:adj_y2, adj_x1:adj_x2]
-		
-		#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
-		inverseSource = 1-source[:,:,3]
-		normalSource = source[:,:,3]
-
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 0] = ((destination[:,:,0] * (inverseSource)) + (source[:,:,0] * normalSource))*255
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = ((destination[:,:,1] * (inverseSource)) + (source[:,:,1] * normalSource))*255
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = ((destination[:,:,2] * (inverseSource)) + (source[:,:,2] * normalSource))*255			
-		layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = (destination[:,:,3] + (1 - destination[:,:,3]) * normalSource)*255;
-		
 	#Make a single dab on the canvas
 	def makeDab(self, layer, x, y, color, secondColor, mirror=''):
 		#Prepare the dab with all the fuzzy parameters 
 		coloredBrushSource = self.prepareDab(color, secondColor)		
-
 		#Apply scattering if any
 		if self.fuzzyDabScatter != 0:
 			randomAngle = randInt(0,360)
@@ -247,20 +211,146 @@ class Brush:
 			x += dcos(randomAngle)*randomLength
 			y += dsin(randomAngle)*randomLength
 		
-		#Round up all the coordinates and convert them to int 
-		x, y = int(x-self.brushSize*0.5), int(y-self.brushSize*0.5)
+		#Round up all the coordinates and convert them to int		
+		if mirror=='': 		mirror = 0
+		elif mirror=='h': 	mirror = 1
+		elif mirror=='v': 	mirror = 2
+		elif mirror=='hv': 	mirror = 3
 		
-		#Apply the preprocessed dab onto the canvas with mirrors
-		self.applyDab(layer, x, y, coloredBrushSource)
-		if mirror=='h' or mirror=='hv':
-			brushSourceFlipped = N.fliplr(N.copy(coloredBrushSource))
-			self.applyDab(layer, layer.data.shape[0]-x-brushSourceFlipped.shape[0], y, brushSourceFlipped)
-		if mirror=='v' or mirror=='hv':
-			brushSourceFlipped = N.flipud(N.copy(coloredBrushSource))
-			self.applyDab(layer, x, layer.data.shape[1]-y-coloredBrushSource.shape[1], brushSourceFlipped)
-		if mirror=='hv':
-			brushSourceFlipped = N.fliplr(N.copy(coloredBrushSource))
-			brushSourceFlippedFlipped = N.flipud(N.copy(brushSourceFlipped))
-			self.applyDab(layer, layer.data.shape[0]-x-brushSourceFlippedFlipped.shape[0], layer.data.shape[1]-y-brushSourceFlippedFlipped.shape[1], brushSourceFlippedFlipped)
+		vectorizedApplyMirroredDab(mirror, layer.data, int(x-self.brushSize*0.5), int(y-self.brushSize*0.5), coloredBrushSource, config.CANVAS_SIZE, self.brushMask)
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@jit([void(float32[:,:], float32[:,:])], nopython=True, nogil=True)
+def test1(A, B):
+	A *= B
+
+@jit([float32[:,:](float32[:,:], float32[:,:], float32[:,:], float32[:,:])], nopython=True, nogil=True)
+def test2(Dest, invSourceAlpha, source, sourceAlpha):
+	return ((Dest * invSourceAlpha) + (source * sourceAlpha))*255
+		
+@jit([float32[:,:](float32[:,:], float32[:,:])], nopython=True, nogil=True)
+def test3(Dest, sourceAlpha):
+	return (Dest + (1 - Dest) * sourceAlpha)*255
+	
+@jit(void(uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True)
+def vectorizedApplyDab(layerData, x, y, source, canvSize, brushMask):
+	#Get the final dab size
+	dabSizeX, dabSizeY = source.shape[:2]
+	
+	#Adjust coordinates and make sure we are inside (at least partially) the canvas
+	adj_x1, adj_y1 = int(max(0, min(canvSize, x))), 			int(max(0, min(canvSize, y)))
+	adj_x2, adj_y2 = int(max(0, min(canvSize, x+dabSizeX))), 	int(max(0, min(canvSize, y+dabSizeY)))
+	if adj_x1==adj_x2 or adj_y1==adj_y2:return
+	
+	#Get the slice and uniform to [0-1]
+	destination = N.divide(N.copy(layerData[adj_y1:adj_y2, adj_x1:adj_x2].astype(N.float32)), 255)
+	
+	#Calculate the correct range to make sure it works even on canvas border 
+	bx1 = 0 if (x>=0) else dabSizeX-adj_x2
+	bx2 = bx1+dabSizeX if (x+dabSizeX<canvSize) else canvSize - adj_x1
+	by1 = 0 if (y>=0) else dabSizeY-adj_y2
+	by2 = by1+dabSizeY if (y+dabSizeY<canvSize) else canvSize - adj_y1
+	
+	#Color the brush, slice it if is on the canvas border, and apply the brush texture on it
+	source = source[by1:by2, bx1:bx2,:]
+	test1(source[:,:,3], brushMask[adj_y1:adj_y2, adj_x1:adj_x2])
+	
+	#Apply source image over destination using the SRC alpha ADD DEST inverse_alpha blending method
+	inverseSource = N.subtract(1, source[:,:,3])
+	normalSource = source[:,:,3]
+	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 0] = test2(destination[:,:,0], inverseSource, source[:,:,0], normalSource).astype(N.uint8)
+	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = test2(destination[:,:,1], inverseSource, source[:,:,1], normalSource).astype(N.uint8)
+	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = test2(destination[:,:,2], inverseSource, source[:,:,2], normalSource).astype(N.uint8)
+	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = test3(destination[:,:,3], normalSource).astype(N.uint8)
+	
+
+@jit(void(int64, uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True)
+def vectorizedApplyMirroredDab(mirror, layerData, x, y, source, canvSize, brushMask):
+	#Apply the first normal dab
+	vectorizedApplyDab(layerData, x, y, source, canvSize, brushMask)
+
+	#Mirrored horizontally
+	if mirror==1 or mirror==3:
+		brushSourceFlipped = N.copy(source)[:,::-1]
+		vectorizedApplyDab(layerData, layerData.shape[0]-x-brushSourceFlipped.shape[0], y, brushSourceFlipped, canvSize, brushMask)
+
+	#Mirrored vertically
+	if mirror==2 or mirror==3:
+		brushSourceFlipped = N.copy(source)[::-1]
+		vectorizedApplyDab(layerData, x, layerData.shape[1]-y-source.shape[1], source, canvSize, brushMask)
+	
+	#Double mirrored
+	if mirror==3:
+		brushSourceFlipped = N.copy(source)[:,::-1]
+		brushSourceFlippedFlipped = N.copy(brushSourceFlipped)[::-1]
+		vectorizedApplyDab(layerData, layerData.shape[0]-x-brushSourceFlippedFlipped.shape[0], layerData.shape[1]-y-brushSourceFlippedFlipped.shape[1], brushSourceFlippedFlipped, canvSize, brushMask)
+
+
+
+
+
+
+
 
 

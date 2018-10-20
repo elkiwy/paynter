@@ -1,5 +1,6 @@
 #External modules
 import numpy as N 
+from numba import jit
 
 #Python base libs
 import random
