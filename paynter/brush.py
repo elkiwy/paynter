@@ -7,7 +7,6 @@ from numba import guvectorize, vectorize, jit, int32, float32, int64, float64, u
 import paynter.config as config
 from .utils import *
 from .color import *
-from .jitted import *
 
 import time
 
@@ -57,12 +56,14 @@ class Brush:
 	originalSpacing = 0
 	originalSize = 0
 	realCurrentSize = 0
+	coloredBrushSource = None 
+	usesSourceCaching = False
 
 	#Create the brush
 	def __init__(self, tipImage, maskImage, size = 50, 
 				angle = 0, spacing = 1, 
 				fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0, fuzzyDabVal = 0, fuzzyDabMix = 0,
-				fuzzyDabScatter = 0):
+				fuzzyDabScatter = 0, usesSourceCaching = False):
 		#Downsample the size-related parameters
 		self.originalSize = size
 		self.realCurrentSize = size
@@ -95,6 +96,7 @@ class Brush:
 		self.fuzzyDabVal = fuzzyDabVal
 		self.fuzzyDabMix = fuzzyDabMix
 		self.fuzzyDabScatter = fuzzyDabScatter
+		self.usesSourceCaching = usesSourceCaching
 
 		#Set the brush mask
 		if maskImage!="":
@@ -114,6 +116,13 @@ class Brush:
 			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			bm[:,:] = 0
 			self.brushMask = 1-bm
+
+
+	def doesUseSourceCaching(self):
+		return self.usesSourceCaching
+
+	def cacheBrush(self, color):
+		self.coloredBrushSource = self.brushTip[:,:] * color.get_0_1()
 
 
 	def resizeBrush(self, newSize):
@@ -149,15 +158,10 @@ class Brush:
 		#Set the perameters
 		self.spacing = newSize*self.originalSpacing
 
-			
-.class_type.instance_type
+
 	def prepareDab(self, color, secondColor):
 		#Get the brush image image 
-		brushSource = 0
-		if self.multibrush:
-			brushSource = self.brushTip[randInt(0,len(self.brushTip)-1)]
-		else:
-			brushSource = self.brushTip
+		brushSource = self.brushTip if not self.multibrush else self.brushTip[randInt(0,len(self.brushTip)-1)]
 
 		#Apply transformations
 		if self.fuzzyDabAngle!=0 or self.fuzzyDabSize!=0:
@@ -177,47 +181,47 @@ class Brush:
 			#Reconvert brushSource to an array
 			brushSource = N.array(img, dtype=N.float32)/255
 
-		#Apply fuzzy color transformations
-		dabColor = color.copy()
 		if self.fuzzyDabHue!=0 or self.fuzzyDabSat!=0 or self.fuzzyDabVal!=0 or self.fuzzyDabMix!=0:
+			#Apply fuzzy color transformations
+			tmpColor = color.copy()
+			
 			#Mix colors
 			if self.fuzzyDabMix!=0:
 				fuz = fuzzy(self.fuzzyDabMix)
-				dabColor.r = min(1, (dabColor.r*(1-fuz) + secondColor.r*fuz))
-				dabColor.g = min(1, (dabColor.g*(1-fuz) + secondColor.g*fuz))
-				dabColor.b = min(1, (dabColor.b*(1-fuz) + secondColor.b*fuz))
+				tmpColor.r = min(1, (tmpColor.r*(1-fuz) + secondColor.r*fuz))
+				tmpColor.g = min(1, (tmpColor.g*(1-fuz) + secondColor.g*fuz))
+				tmpColor.b = min(1, (tmpColor.b*(1-fuz) + secondColor.b*fuz))
 				
 			#Fuzzy Hue
 			if self.fuzzyDabHue!=0:
-				dabColor.tweak_Hue(fuzzy(self.fuzzyDabHue))
+				tmpColor.tweak_Hue(fuzzy(self.fuzzyDabHue))
 			#Fuzzy Saturation
 			if self.fuzzyDabSat!=0:
-				dabColor.tweak_Sat(fuzzy(self.fuzzyDabSat))
+				tmpColor.tweak_Sat(fuzzy(self.fuzzyDabSat))
 			#Fuzzy Value
 			if self.fuzzyDabVal!=0:
-				dabColor.tweak_Val(fuzzy(self.fuzzyDabVal))
+				tmpColor.tweak_Val(fuzzy(self.fuzzyDabVal))
+
+			color = tmpColor
 
 		#Color the brush
-		return brushSource[:,:] * dabColor.get_0_1()
+		return brushSource[:,:] * color.get_0_1()
 
 	#Make a single dab on the canvas
 	def makeDab(self, layer, x, y, color, secondColor, mirror=''):
-		#Prepare the dab with all the fuzzy parameters 
-		coloredBrushSource = self.prepareDab(color, secondColor)		
+		#Prepare the dab only if i don't have source caching
+		if not self.usesSourceCaching:
+			#Prepare the dab with all the fuzzy parameters 
+			self.coloredBrushSource = self.prepareDab(color, secondColor)
+
 		#Apply scattering if any
 		if self.fuzzyDabScatter != 0:
 			randomAngle = randInt(0,360)
 			randomLength = fuzzy(self.fuzzyDabScatter)
 			x += dcos(randomAngle)*randomLength
 			y += dsin(randomAngle)*randomLength
-		
-		#Round up all the coordinates and convert them to int		
-		if mirror=='': 		mirror = 0
-		elif mirror=='h': 	mirror = 1
-		elif mirror=='v': 	mirror = 2
-		elif mirror=='hv': 	mirror = 3
-		
-		vectorizedApplyMirroredDab(mirror, layer.data, int(x-self.brushSize*0.5), int(y-self.brushSize*0.5), coloredBrushSource, config.CANVAS_SIZE, self.brushMask)
+				
+		vectorizedApplyMirroredDab(mirror, layer.data, int(x-self.brushSize*0.5), int(y-self.brushSize*0.5), self.coloredBrushSource.copy(), config.CANVAS_SIZE, self.brushMask)
 		
 
 
@@ -230,6 +234,7 @@ class Brush:
 
 
 
+	
 
 
 
@@ -281,19 +286,25 @@ class Brush:
 
 
 
-@jit([void(float32[:,:], float32[:,:])], nopython=True, nogil=True)
+
+
+
+
+jitCachingEnable = True
+
+@jit([void(float32[:,:], float32[:,:])], nopython=True, nogil=True, cache=jitCachingEnable)
 def test1(A, B):
 	A *= B
 
-@jit([float32[:,:](float32[:,:], float32[:,:], float32[:,:], float32[:,:])], nopython=True, nogil=True)
+@jit([float32[:,:](float32[:,:], float32[:,:], float32[:,:], float32[:,:])], nopython=True, nogil=True, cache=jitCachingEnable)
 def test2(Dest, invSourceAlpha, source, sourceAlpha):
 	return ((Dest * invSourceAlpha) + (source * sourceAlpha))*255
 		
-@jit([float32[:,:](float32[:,:], float32[:,:])], nopython=True, nogil=True)
+@jit([float32[:,:](float32[:,:], float32[:,:])], nopython=True, nogil=True, cache=jitCachingEnable)
 def test3(Dest, sourceAlpha):
 	return (Dest + (1 - Dest) * sourceAlpha)*255
 	
-@jit(void(uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True)
+@jit(void(uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True, cache=jitCachingEnable)
 def vectorizedApplyDab(layerData, x, y, source, canvSize, brushMask):
 	#Get the final dab size
 	dabSizeX, dabSizeY = source.shape[:2]
@@ -325,7 +336,7 @@ def vectorizedApplyDab(layerData, x, y, source, canvSize, brushMask):
 	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = test3(destination[:,:,3], normalSource).astype(N.uint8)
 	
 
-@jit(void(int64, uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True)
+@jit(void(int64, uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True, cache=jitCachingEnable)
 def vectorizedApplyMirroredDab(mirror, layerData, x, y, source, canvSize, brushMask):
 	#Apply the first normal dab
 	vectorizedApplyDab(layerData, x, y, source, canvSize, brushMask)

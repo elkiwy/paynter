@@ -115,12 +115,7 @@ class Color:
 
 	#Sets a new alpha value
 	def set_alpha(self, newAlpha):
-		if newAlpha>=0 and newAlpha<=1:
-			self.a = newAlpha
-		else:
-			print('ERROR: Color::set_alpha only supports 0-1 values, got: ')
-			print(newAlpha)
-			sys.exit()
+		self.a = newAlpha
 		return self
 
 	#Tweak the hue

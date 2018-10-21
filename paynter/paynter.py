@@ -15,6 +15,7 @@ from .layer import *
 import paynter.config as config
 
 
+from numba import jit, int32, int64, float32, float64, prange
 import time
 
 
@@ -51,6 +52,8 @@ class Paynter:
 	######################################################################
 	#Draw a line between two points
 	def drawLine(self, x1, y1, x2, y2):
+		start = time.time()
+
 		#Downsample the coordinates
 		x1 = int(x1/config.DOWNSAMPLING)
 		x2 = int(x2/config.DOWNSAMPLING)
@@ -58,34 +61,40 @@ class Paynter:
 		y2 = int(y2/config.DOWNSAMPLING)
 		print('drawing line from: '+str((x1,y1))+' to: '+str((x2,y2)))
 
+		#if self.brush.usesSourceCaching:
+		#	drawLine_jit(x1,y1,x2,y2,self.mirrorMode, self.image.getActiveLayer().data, config.CANVAS_SIZE,
+		#				self.brush.brushSize, self.brush.coloredBrushSource, self.brush.brushMask, self.brush.spacing)
+		#	config.AVGTIME.append(time.time()-start)
+		#	return
 
 		#Calculate the direction and the length of the step
-		direction = math.degrees(math.atan2(y2 - y1, x2 - x1))
+		direction = N.arctan2(y2 - y1, x2 - x1)
 		length = self.brush.spacing
 
 		#Prepare the loop
 		x, y = x1, y1
-		currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
-		previousDist = currentDist+1
-
+		totalSteps = int(N.sqrt((x2 - x)**2 + (y2 - y)**2)/length)
+		
 		#Do all the steps until I passed the target point
-		while(previousDist>currentDist):
+		for _ in range(totalSteps):
 			#Make the dab on this point
 			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 
 			#Mode the point for the next step and update the distances
-			x += length*dcos(direction)
-			y += length*dsin(direction)
-			previousDist = currentDist
-			currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
-
+			x += lendir_x(length, direction)
+			y += lendir_y(length, direction)
+		config.AVGTIME.append(time.time()-start)
+		
 	#Draw a single dab
 	def drawPoint(self, x, y):
+		start = time.time()
 		x = int(x/config.DOWNSAMPLING)
 		y = int(y/config.DOWNSAMPLING)
 
-		start = time.time()
-		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
+		if self.brush.usesSourceCaching:
+			vectorizedApplyMirroredDab(self.mirrorMode, self.image.getActiveLayer().data, int(x-self.brush.brushSize*0.5), int(y-self.brush.brushSize*0.5), self.brush.coloredBrushSource.copy(), config.CANVAS_SIZE, self.brush.brushMask)
+		else:
+			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 		config.AVGTIME.append(time.time()-start)
 		
 	######################################################################
@@ -160,6 +169,8 @@ class Paynter:
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, color):
 		self.color = color
+		if self.brush and self.brush.doesUseSourceCaching():
+			self.brush.cacheBrush(color)
 
 	def setColorAlpha(self, alpha):
 		self.color.set_alpha(alpha)
@@ -174,10 +185,18 @@ class Paynter:
 	def setBrush(self, b, resize=0):
 		b.resizeBrush(resize) #If resize=0 it reset to its default size
 		self.brush = b
+		if self.brush and self.brush.doesUseSourceCaching():
+			self.brush.cacheBrush(self.color)
 
 	#Setter for the mirror mode
 	def setMirrorMode(self, mirror):
 		assert (mirror=='' or mirror=='h' or mirror=='v' or mirror=='hv'), 'setMirrorMode: wrong mirror mode, got '+str(mirror)+' expected one of ["","h","v","hv"]'
+		
+		#Round up all the coordinates and convert them to int		
+		if mirror=='': 		mirror = 0
+		elif mirror=='h': 	mirror = 1
+		elif mirror=='v': 	mirror = 2
+		elif mirror=='hv': 	mirror = 3
 		self.mirrorMode = mirror
 		
 	#Render the final image
@@ -221,9 +240,58 @@ class Paynter:
 
 
 
+@jit(float32(float32, float32), nopython=True)
+def lendir_x(l, d):
+	return l*N.cos(d)
+
+@jit(float32(float32, float32), nopython=True)
+def lendir_y(l, d):
+	return l*N.sin(d)
 
 
 
+
+
+
+#
+#@jit([void(int32, int32, int32, float32, int64, uint8[:,:,:], int64, int32, float32[:,:,:], float32[:,:], int32)], nopython=True, parallel = True)
+#def test(x, y, total, direction, mirrorMode, layerData, canvSize, brushSize, brushSource, brushMask, brushSpacing):
+#	for i in range(total):
+#		#print((int(x-brushSize*0.5), int(y-brushSize*0.5)))
+#		#Make the dab on this point
+#		vectorizedApplyMirroredDab(mirrorMode, layerData, int(x-brushSize*0.5), int(y-brushSize*0.5), brushSource.copy(), canvSize, brushMask)
+#		
+#		#Mode the point for the next step and update the distances
+#		x += brushSpacing*N.cos(direction)
+#		y += brushSpacing*N.sin(direction)
+#		#previousDist = currentDist
+#		#currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
+#	
+#
+#
+#
+#
+##Draw a line between two points
+#@jit([void(int32, int32, int32, int32, int64, uint8[:,:,:], int64, int32, float32[:,:,:], float32[:,:], int32)], nopython=True, parallel = False)
+#def drawLine_jit(x1, y1, x2, y2, mirrorMode, layerData, canvSize,
+#				brushSize, brushSource, brushMask, brushSpacing):
+#
+#	#Calculate the direction and the length of the step
+#	direction = N.arctan2(y2 - y1, x2 - x1)
+#	
+#	#print((x1,y1,x2,y2))
+#	#Prepare the loop
+#	x = x1
+#	y = y1
+#	currentDist = N.sqrt((x2 - x)**2 + (y2 - y)**2)
+#	previousDist = currentDist+1
+#
+#	total = int(currentDist/brushSpacing)
+#
+#	#Do all the steps until I passed the target point
+#	#print((int(x-brushSize*0.5), int(y-brushSize*0.5)))
+#	test(x, y, total, direction, mirrorMode, layerData, canvSize, brushSize, brushSource, brushMask, brushSpacing)
+#
 
 
 
