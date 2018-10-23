@@ -170,16 +170,15 @@ class Brush:
 			
 			#Apply fuzzy scale
 			if self.fuzzyDabAngle!=0:
-				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1, resample=rotateResample)
-				brushSource = N.array(img)/255
-
+				img = img.rotate(fuzzy(self.fuzzyDabAngle), expand=1, resample=PIL.Image.NEAREST)
+		
 			#Apply fuzzy scale
 			if self.fuzzyDabSize!=0:
 				fuz = fuzzy(self.fuzzyDabSize)
-				img = img.resize((int(img.width*fuz), int(img.height*fuz)), resample=resizeResample)
+				img = img.resize((int(img.width*fuz), int(img.height*fuz)), resample=PIL.Image.NEAREST)
 			
 			#Reconvert brushSource to an array
-			brushSource = N.array(img, dtype=N.float32)/255
+			brushSource = N.array(img, dtype=N.float32)*0.0039
 
 		if self.fuzzyDabHue!=0 or self.fuzzyDabSat!=0 or self.fuzzyDabVal!=0 or self.fuzzyDabMix!=0:
 			#Apply fuzzy color transformations
@@ -195,9 +194,11 @@ class Brush:
 			#Fuzzy Hue
 			if self.fuzzyDabHue!=0:
 				tmpColor.tweak_Hue(fuzzy(self.fuzzyDabHue))
+
 			#Fuzzy Saturation
 			if self.fuzzyDabSat!=0:
 				tmpColor.tweak_Sat(fuzzy(self.fuzzyDabSat))
+
 			#Fuzzy Value
 			if self.fuzzyDabVal!=0:
 				tmpColor.tweak_Val(fuzzy(self.fuzzyDabVal))
@@ -208,7 +209,7 @@ class Brush:
 		return brushSource[:,:] * color.get_0_1()
 
 	#Make a single dab on the canvas
-	def makeDab(self, layer, x, y, color, secondColor, mirror=''):
+	def makeDab(self, layer, x, y, color, secondColor, mirror=0):
 		#Prepare the dab only if i don't have source caching
 		if not self.usesSourceCaching:
 			#Prepare the dab with all the fuzzy parameters 
@@ -216,10 +217,10 @@ class Brush:
 
 		#Apply scattering if any
 		if self.fuzzyDabScatter != 0:
-			randomAngle = randInt(0,360)
+			randomAngle = random.uniform(0,6.28)
 			randomLength = fuzzy(self.fuzzyDabScatter)
-			x += dcos(randomAngle)*randomLength
-			y += dsin(randomAngle)*randomLength
+			x += N.cos(randomAngle)*randomLength
+			y += N.sin(randomAngle)*randomLength
 				
 		vectorizedApplyMirroredDab(mirror, layer.data, int(x-self.brushSize*0.5), int(y-self.brushSize*0.5), self.coloredBrushSource.copy(), config.CANVAS_SIZE, self.brushMask)
 		

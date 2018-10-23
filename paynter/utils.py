@@ -1,6 +1,6 @@
 #External modules
 import numpy as N 
-from numba import jit
+from numba import jit, float32, int64
 
 #Python base libs
 import random
@@ -33,7 +33,7 @@ def dsin(deg):
 
 #Get fuzzy
 def fuzzy(fuzzyRange):
-	return randFloat(fuzzyRange[0], fuzzyRange[1])
+	return random.uniform(fuzzyRange[0], fuzzyRange[1])
 
 #Rotate a list of points around a center for an angle
 def rotateMatrix(pointList, cx, cy, angle):

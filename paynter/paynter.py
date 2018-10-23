@@ -37,7 +37,7 @@ class Paynter:
 	color = Color(0, 0, 0, 1)
 	secondColor = Color(1,1,1,1)
 	image = 0
-	mirrorMode = '' # ''/'h'/'v'/'hv'
+	mirrorMode = 0 # ''/'h'/'v'/'hv'
 
 	#Init the paynter
 	def __init__(self):
@@ -61,12 +61,6 @@ class Paynter:
 		y2 = int(y2/config.DOWNSAMPLING)
 		print('drawing line from: '+str((x1,y1))+' to: '+str((x2,y2)))
 
-		#if self.brush.usesSourceCaching:
-		#	drawLine_jit(x1,y1,x2,y2,self.mirrorMode, self.image.getActiveLayer().data, config.CANVAS_SIZE,
-		#				self.brush.brushSize, self.brush.coloredBrushSource, self.brush.brushMask, self.brush.spacing)
-		#	config.AVGTIME.append(time.time()-start)
-		#	return
-
 		#Calculate the direction and the length of the step
 		direction = N.arctan2(y2 - y1, x2 - x1)
 		length = self.brush.spacing
@@ -76,13 +70,36 @@ class Paynter:
 		totalSteps = int(N.sqrt((x2 - x)**2 + (y2 - y)**2)/length)
 		
 		#Do all the steps until I passed the target point
-		for _ in range(totalSteps):
-			#Make the dab on this point
-			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
+		lay = self.image.getActiveLayer()
+		col = self.color
+		secCol = self.secondColor
+		mirr = self.mirrorMode
 
-			#Mode the point for the next step and update the distances
-			x += lendir_x(length, direction)
-			y += lendir_y(length, direction)
+
+		if self.brush.usesSourceCaching:
+			laydata = lay.data
+			x -= self.brush.brushSize*0.5
+			y -= self.brush.brushSize*0.5
+			colbrsource = self.brush.coloredBrushSource
+			canvSize = config.CANVAS_SIZE
+			brmask = self.brush.brushMask
+			for _ in range(totalSteps):
+				#Make the dab on this point
+				vectorizedApplyMirroredDab(mirr, laydata, int(x), int(y), colbrsource.copy(), canvSize, brmask)
+
+				#Mode the point for the next step and update the distances
+				x += lendir_x(length, direction)
+				y += lendir_y(length, direction)
+
+		else:
+			for _ in range(totalSteps):
+				#Make the dab on this point
+				self.brush.makeDab(lay, int(x), int(y), col, secCol, mirror=mirr)
+
+				#Mode the point for the next step and update the distances
+				x += lendir_x(length, direction)
+				y += lendir_y(length, direction)
+			
 		config.AVGTIME.append(time.time()-start)
 		
 	#Draw a single dab
@@ -190,13 +207,14 @@ class Paynter:
 
 	#Setter for the mirror mode
 	def setMirrorMode(self, mirror):
-		assert (mirror=='' or mirror=='h' or mirror=='v' or mirror=='hv'), 'setMirrorMode: wrong mirror mode, got '+str(mirror)+' expected one of ["","h","v","hv"]'
+		assert (mirror=='' or mirror=='h' or mirror=='v' or mirror=='hv'or mirror=='vh'), 'setMirrorMode: wrong mirror mode, got '+str(mirror)+' expected one of ["","h","v","hv"]'
 		
 		#Round up all the coordinates and convert them to int		
 		if mirror=='': 		mirror = 0
 		elif mirror=='h': 	mirror = 1
 		elif mirror=='v': 	mirror = 2
 		elif mirror=='hv': 	mirror = 3
+		elif mirror=='vh': 	mirror = 3
 		self.mirrorMode = mirror
 		
 	#Render the final image
