@@ -21,18 +21,21 @@ This is a list with what there is currently inside the code:
 		- Color Saturation
 		- Color Value
 		- Dab position scattering
-
-- PaYnter features:
-	- Layer management
-		- New layer creation
-		- Layer merging with blending modes
-	- Brush management
-	- Palette and colors management
+- Layer management
+	- New layer creation
+	- Layer merging with blending modes
+- Color management
+	- Palette creation
 		- Triad palette
 		- Separate Hue, Saturation, and Value tweaking
-	- Drawing functions like:
-		- DrawLine(x1, y1, x2, y2)
-		- DrawPoint(x, y)
+- Brush mirroring
+- Drawing functions like:
+	- DrawLine(x1, y1, x2, y2)
+	- DrawPoint(x, y)
+	- DrawRect(x1, y1, x2, y2, angle)
+	- DrawPath(pointList)
+	- AddBorder(width)
+	
 
 
 # How to use it
@@ -42,7 +45,7 @@ Right now there isn't much you can do with PaYnter since is really early in the 
 
 # Dependencies
 
-PaYnter only depends by the **Numpy** and **PIL** modules both of which can be installed easily with Pip, anything else should come with the python3 bundle.
+PaYnter needs **Numpy**, **Numba**, and **PIL** modules. Those can all be installed easily with Pip, anything else should come with the python3 bundle.
 
 
 # Scope 
