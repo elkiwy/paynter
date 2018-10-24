@@ -22,7 +22,7 @@ class Layer:
 		if type(data) is not N.ndarray:
 			self.data = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE, 4), dtype=N.uint8)
 			if color==None:
-				color = Color(1,1,1,0)
+				color = Color(0,0,0,0)
 			colorRGBA = color.get_0_255()
 			self.data[:,:,0] = colorRGBA[0]
 			self.data[:,:,1] = colorRGBA[1]

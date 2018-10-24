@@ -103,12 +103,13 @@ class Brush:
 			res = PIL.Image.open(config.ROOT+'/res/'+maskImage)
 			while res.width>config.CANVAS_SIZE:
 				res = res.resize((int(res.width/2),int(res.width/2)), resample=resizeResample)
-
+			res.show()
 			alpha = res.split()[0] #Take only the red channel since is black and white
 			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			for j in range(0, config.CANVAS_SIZE, res.width):
 				for i in range(0, config.CANVAS_SIZE, res.width):
-					bm[i:i+res.width, j:j+res.width] = N.divide(N.array(alpha), 255)*5
+					bm[i:i+res.width, j:j+res.width] = N.divide(N.array(alpha), 255)
+			print(bm[0:2,0:2])
 			self.brushMask = 1-bm
 		
 		else:
@@ -335,7 +336,8 @@ def vectorizedApplyDab(layerData, x, y, source, canvSize, brushMask):
 	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 1] = test2(destination[:,:,1], inverseSource, source[:,:,1], normalSource).astype(N.uint8)
 	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 2] = test2(destination[:,:,2], inverseSource, source[:,:,2], normalSource).astype(N.uint8)
 	layerData[adj_y1:adj_y2, adj_x1:adj_x2, 3] = test3(destination[:,:,3], normalSource).astype(N.uint8)
-	
+
+
 
 @jit(void(int64, uint8[:,:,:], int64, int64, float32[:,:,:], int64, float32[:,:]), nopython=True, cache=jitCachingEnable)
 def vectorizedApplyMirroredDab(mirror, layerData, x, y, source, canvSize, brushMask):
