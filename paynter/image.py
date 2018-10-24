@@ -45,9 +45,8 @@ class Image:
 	#Merge the bottom layer with the layer above that
 	def mergeBottomLayers(self):
 		#Debug show the two layer being merged
-		#self.layers[0].showLayer(debugText='baseLayer'+str(len(self.layers)))
-		#self.layers[1].showLayer(debugText='overLayer'+str(len(self.layers)))
-
+		print('merging layers with:'+str(self.layers[1].effect))
+	
 		#Normal paste on top
 		if self.layers[1].effect=='':
 			baseImage = PIL.Image.fromarray(self.layers[0].data, 'RGBA')
@@ -65,5 +64,4 @@ class Image:
 		del self.layers[0]			
 		self.layers[0] = Layer(data = newImage)
 
-		#Debug show the result layer
-		#self.layers[0].showLayer(debugText='merging layers'+str(len(self.layers)))
+	

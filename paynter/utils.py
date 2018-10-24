@@ -10,6 +10,13 @@ import colorsys
 ######################################################################
 # Useful Functions
 ######################################################################
+#Jitted functions for trigonometry
+@jit(float32(float32, float32), nopython=True, cache=True)
+def lendir_x(l, d):
+	return l*N.cos(d)
+@jit(float32(float32, float32), nopython=True, cache=True)
+def lendir_y(l, d):
+	return l*N.sin(d)
 
 #Clamp shortcut
 def clamp(x, mi, ma):

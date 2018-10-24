@@ -1,7 +1,7 @@
 #External modules
 import PIL.Image
 import numpy as N
-from numba import guvectorize, vectorize, jit, int32, float32, int64, float64, uint8, void
+from numba import jit, int32, float32, int64, float64, uint8, void
 
 #PaYnter Modules
 import paynter.config as config
@@ -103,13 +103,11 @@ class Brush:
 			res = PIL.Image.open(config.ROOT+'/res/'+maskImage)
 			while res.width>config.CANVAS_SIZE:
 				res = res.resize((int(res.width/2),int(res.width/2)), resample=resizeResample)
-			res.show()
 			alpha = res.split()[0] #Take only the red channel since is black and white
 			bm = N.zeros((config.CANVAS_SIZE, config.CANVAS_SIZE), dtype=N.float32)
 			for j in range(0, config.CANVAS_SIZE, res.width):
 				for i in range(0, config.CANVAS_SIZE, res.width):
 					bm[i:i+res.width, j:j+res.width] = N.divide(N.array(alpha), 255)
-			print(bm[0:2,0:2])
 			self.brushMask = 1-bm
 		
 		else:
