@@ -14,6 +14,8 @@ import colorsys
 @jit(float32(float32, float32), nopython=True, cache=True)
 def lendir_x(l, d):
 	return l*N.cos(d)
+
+#Jitted functions for trigonometry
 @jit(float32(float32, float32), nopython=True, cache=True)
 def lendir_y(l, d):
 	return l*N.sin(d)
@@ -24,7 +26,13 @@ def clamp(x, mi, ma):
 
 #Random shortcut
 def randInt(a,b):
-	return random.randint(a,b) #inclusive
+	if int(a)==int(b):
+		return int(a)
+	if a>b:
+		tmp = b 
+		b = a 
+		a = b
+	return random.randint(int(a),int(b)) #inclusive
 
 #Random shortcut
 def randFloat(a,b):
@@ -43,8 +51,7 @@ def fuzzy(fuzzyRange):
 	return random.uniform(fuzzyRange[0], fuzzyRange[1])
 
 #Rotate a list of points around a center for an angle
-def rotateMatrix(pointList, cx, cy, angle):
-	
+def rotateMatrix(pointList, cx, cy, angle):	
 	rotatedPoints = []
 	#For each point in the list
 	for point in pointList:

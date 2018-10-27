@@ -81,7 +81,7 @@ class Paynter:
 			brmask = self.brush.brushMask
 			for _ in range(totalSteps):
 				#Make the dab on this point
-				vectorizedApplyMirroredDab(mirr, laydata, int(x), int(y), colbrsource.copy(), canvSize, brmask)
+				applyMirroredDab_jit(mirr, laydata, int(x), int(y), colbrsource.copy(), canvSize, brmask)
 
 				#Mode the point for the next step and update the distances
 				x += lendir_x(length, direction)
@@ -97,7 +97,6 @@ class Paynter:
 				x += lendir_x(length, direction)
 				y += lendir_y(length, direction)
 			
-		config.AVGTIME.append(time.time()-start)
 		
 	#Draw a single dab
 	def drawPoint(self, x, y):
@@ -109,7 +108,7 @@ class Paynter:
 
 		#Apply the dab with or without source caching
 		if self.brush.usesSourceCaching:
-			vectorizedApplyMirroredDab(self.mirrorMode, self.image.getActiveLayer().data, int(x-self.brush.brushSize*0.5), int(y-self.brush.brushSize*0.5), self.brush.coloredBrushSource.copy(), config.CANVAS_SIZE, self.brush.brushMask)
+			applyMirroredDab_jit(self.mirrorMode, self.image.getActiveLayer().data, int(x-self.brush.brushSize*0.5), int(y-self.brush.brushSize*0.5), self.brush.coloredBrushSource.copy(), config.CANVAS_SIZE, self.brush.brushMask)
 		else:
 			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 		config.AVGTIME.append(time.time()-start)
@@ -179,6 +178,7 @@ class Paynter:
 
 
 
+
 	######################################################################
 	# Setters, getters, and more
 	######################################################################
@@ -189,8 +189,19 @@ class Paynter:
 			self.brush.cacheBrush(color)
 
 	#Change only the alpha of the current color
-	def setColorAlpha(self, alpha):
-		self.color.set_alpha(alpha)
+	def setColorAlpha(self, fixed=None, proportional=None):
+		if fixed!=None:
+			self.color.set_alpha(fixed)
+		elif proportional!=None:
+			self.color.set_alpha(self.color.get_alpha()*proportional)
+
+	#Gets the brush alpha
+	def getColorAlpha(self):
+		return self.color.get_alpha()
+
+	#Gets the brush size
+	def getBrushSize(self):
+		return self.brush.brushSize
 
 	#Swap between first and second color
 	def swapColors(self):
@@ -199,7 +210,9 @@ class Paynter:
 		self.secondColor = Color(rgba, '0-255')
 
 	#Setter for brush reference
-	def setBrush(self, b, resize=0):
+	def setBrush(self, b, resize=0, proportional=None):
+		if proportional!=None:
+			resize = int(self.brush.brushSize*0.5)
 		b.resizeBrush(resize) #If resize=0 it reset to its default size
 		self.brush = b
 		if self.brush and self.brush.doesUseSourceCaching():
@@ -218,13 +231,16 @@ class Paynter:
 		self.mirrorMode = mirror
 		
 	#Render the final image
-	def renderImage(self, output=''):
+	def renderImage(self, output='', show=True):
 		#Merge all the layers to apply blending modes
 		resultLayer = self.image.mergeAllLayers()
 
 		#Show and save the results
 		img = PIL.Image.fromarray(resultLayer.data, 'RGBA')
-		img.show()
+		
+		if show:
+			img.show()
+
 		if output!='':
 			img.save(output, 'PNG')
 

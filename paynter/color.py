@@ -118,6 +118,10 @@ class Color:
 		self.a = newAlpha
 		return self
 
+	#Gets the alpha value
+	def get_alpha(self):
+		return self.a
+
 	#Tweak the hue
 	def tweak_Hue(self, ammount):
 		hsv = self.get_HSV()
