@@ -15,12 +15,13 @@ from .layer import *
 import paynter.config as config
 
 
+from numba import jit, float32
+import time
+
 
 '''
 TODO:
 -add asserts to main functions
--uniform the way in main.py we handle paynter and image
--add color class
 '''
 
 ######################################################################
@@ -30,10 +31,10 @@ TODO:
 class Paynter:
 	brush = 0
 	layer = 0
-	color = Color([0, 0, 0, 1], '0-1')
-	secondColor = Color([1, 1, 1, 1], '0-1')
+	color = Color(0, 0, 0, 1)
+	secondColor = Color(1,1,1,1)
 	image = 0
-	mirrorMode = '' # ''/'h'/'v'/'hv'
+	mirrorMode = 0
 
 	#Init the paynter
 	def __init__(self):
@@ -48,6 +49,8 @@ class Paynter:
 	######################################################################
 	#Draw a line between two points
 	def drawLine(self, x1, y1, x2, y2):
+		start = time.time()
+
 		#Downsample the coordinates
 		x1 = int(x1/config.DOWNSAMPLING)
 		x2 = int(x2/config.DOWNSAMPLING)
@@ -55,33 +58,61 @@ class Paynter:
 		y2 = int(y2/config.DOWNSAMPLING)
 		print('drawing line from: '+str((x1,y1))+' to: '+str((x2,y2)))
 
-
 		#Calculate the direction and the length of the step
-		direction = math.degrees(math.atan2(y2 - y1, x2 - x1))
+		direction = N.arctan2(y2 - y1, x2 - x1)
 		length = self.brush.spacing
 
 		#Prepare the loop
 		x, y = x1, y1
-		currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
-		previousDist = currentDist+1
+		totalSteps = int(N.sqrt((x2 - x)**2 + (y2 - y)**2)/length)
+		lay = self.image.getActiveLayer()
+		col = self.color
+		secCol = self.secondColor
+		mirr = self.mirrorMode
 
-		#Do all the steps until I passed the target point
-		while(previousDist>currentDist):
-			#Make the dab on this point
-			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
+		#If I use source caching..
+		if self.brush.usesSourceCaching:
+			#..than optimize it for faster drawing
+			laydata = lay.data
+			x -= self.brush.brushSize*0.5
+			y -= self.brush.brushSize*0.5
+			colbrsource = self.brush.coloredBrushSource
+			canvSize = config.CANVAS_SIZE
+			brmask = self.brush.brushMask
+			for _ in range(totalSteps):
+				#Make the dab on this point
+				applyMirroredDab_jit(mirr, laydata, int(x), int(y), colbrsource.copy(), canvSize, brmask)
 
-			#Mode the point for the next step and update the distances
-			x += length*dcos(direction)
-			y += length*dsin(direction)
-			previousDist = currentDist
-			currentDist = math.sqrt((x2 - x)**2 + (y2 - y)**2)
+				#Mode the point for the next step and update the distances
+				x += lendir_x(length, direction)
+				y += lendir_y(length, direction)
+		#..if I don't use source caching..
+		else:
+			#..do the normal drawing
+			for _ in range(totalSteps):
+				#Make the dab on this point
+				self.brush.makeDab(lay, int(x), int(y), col, secCol, mirror=mirr)
 
+				#Mode the point for the next step and update the distances
+				x += lendir_x(length, direction)
+				y += lendir_y(length, direction)
+			
+		
 	#Draw a single dab
 	def drawPoint(self, x, y):
+		start = time.time()
+
+		#Downsample the coordinates
 		x = int(x/config.DOWNSAMPLING)
 		y = int(y/config.DOWNSAMPLING)
-		self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
 
+		#Apply the dab with or without source caching
+		if self.brush.usesSourceCaching:
+			applyMirroredDab_jit(self.mirrorMode, self.image.getActiveLayer().data, int(x-self.brush.brushSize*0.5), int(y-self.brush.brushSize*0.5), self.brush.coloredBrushSource.copy(), config.CANVAS_SIZE, self.brush.brushMask)
+		else:
+			self.brush.makeDab(self.image.getActiveLayer(), int(x), int(y), self.color, self.secondColor, mirror=self.mirrorMode)
+		config.AVGTIME.append(time.time()-start)
+		
 	######################################################################
 	# Level 1 Functions, calls Level 0 functions, no downsampling
 	######################################################################
@@ -154,6 +185,23 @@ class Paynter:
 	#Setter for color, takes 0-255 RGBA
 	def setColor(self, color):
 		self.color = color
+		if self.brush and self.brush.doesUseSourceCaching():
+			self.brush.cacheBrush(color)
+
+	#Change only the alpha of the current color
+	def setColorAlpha(self, fixed=None, proportional=None):
+		if fixed!=None:
+			self.color.set_alpha(fixed)
+		elif proportional!=None:
+			self.color.set_alpha(self.color.get_alpha()*proportional)
+
+	#Gets the brush alpha
+	def getColorAlpha(self):
+		return self.color.get_alpha()
+
+	#Gets the brush size
+	def getBrushSize(self):
+		return self.brush.brushSize
 
 	#Swap between first and second color
 	def swapColors(self):
@@ -162,27 +210,36 @@ class Paynter:
 		self.secondColor = Color(rgba, '0-255')
 
 	#Setter for brush reference
-	def setBrush(self, b, resize=0):
+	def setBrush(self, b, resize=0, proportional=None):
+		if proportional!=None:
+			resize = int(self.brush.brushSize*0.5)
 		b.resizeBrush(resize) #If resize=0 it reset to its default size
 		self.brush = b
+		if self.brush and self.brush.doesUseSourceCaching():
+			self.brush.cacheBrush(self.color)
 
 	#Setter for the mirror mode
 	def setMirrorMode(self, mirror):
-		assert (mirror=='' or mirror=='h' or mirror=='v' or mirror=='hv'), 'setMirrorMode: wrong mirror mode, got '+str(mirror)+' expected one of ["","h","v","hv"]'
+		assert (mirror=='' or mirror=='h' or mirror=='v' or mirror=='hv'or mirror=='vh'), 'setMirrorMode: wrong mirror mode, got '+str(mirror)+' expected one of ["","h","v","hv"]'
+		
+		#Round up all the coordinates and convert them to int		
+		if mirror=='': 		mirror = 0
+		elif mirror=='h': 	mirror = 1
+		elif mirror=='v': 	mirror = 2
+		elif mirror=='hv': 	mirror = 3
+		elif mirror=='vh': 	mirror = 3
 		self.mirrorMode = mirror
 		
 	#Render the final image
-	def renderImage(self, output=''):
-		#Make sure the alpha on the base layer is ok
-		#self.image.layers[0].data[:,:,3] = 255
-
+	def renderImage(self, output='', show=True):
 		#Merge all the layers to apply blending modes
 		resultLayer = self.image.mergeAllLayers()
-		resultLayerData = resultLayer.data
 
-		#Show the results
-		img = PIL.Image.fromarray(resultLayerData, 'RGBA')
-		img.show()
+		#Show and save the results
+		img = PIL.Image.fromarray(resultLayer.data, 'RGBA')
+		
+		if show:
+			img.show()
 
 		if output!='':
 			img.save(output, 'PNG')
@@ -198,12 +255,6 @@ class Paynter:
 	#Shortcut for image operations
 	def duplicateActiveLayer(self):
 		self.image.duplicateActiveLayer()
-
-
-
-
-
-
 
 
 

@@ -6,6 +6,8 @@ import numpy as N
 from .layer import Layer
 from .blendModes import *
 
+import time
+
 ######################################################################
 # Image Functions
 ######################################################################
@@ -38,32 +40,29 @@ class Image:
 
 	#Merge all the layers together to render the final image
 	def mergeAllLayers(self):
+		start = time.time()
 		while(len(self.layers)>1):
 			self.mergeBottomLayers()
+		print('merge time:'+str(time.time()-start))
 		return self.layers[0]
 
 	#Merge the bottom layer with the layer above that
 	def mergeBottomLayers(self):
 		#Debug show the two layer being merged
-		#self.layers[0].showLayer(debugText='baseLayer'+str(len(self.layers)))
-		#self.layers[1].showLayer(debugText='overLayer'+str(len(self.layers)))
-
+		print('merging layers with:'+str(self.layers[1].effect))
 		#Normal paste on top
 		if self.layers[1].effect=='':
 			baseImage = PIL.Image.fromarray(self.layers[0].data, 'RGBA')
 			overImage = PIL.Image.fromarray(self.layers[1].data, 'RGBA')
 			baseImage = PIL.Image.alpha_composite(baseImage, overImage)
 			newImage = N.array(baseImage)
-
 		#Apply blend mode
 		else:
 			baseImage = self.layers[0].data.astype(N.float32)
 			overImage = self.layers[1].data.astype(N.float32)
 			newImage = mergeImagesWithBlendMode(baseImage, overImage, self.layers[1].effect).astype(N.uint8)
-
 		#Remove one layer and replace the last one
 		del self.layers[0]			
 		self.layers[0] = Layer(data = newImage)
 
-		#Debug show the result layer
-		#self.layers[0].showLayer(debugText='merging layers'+str(len(self.layers)))
+	
