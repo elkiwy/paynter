@@ -34,15 +34,15 @@ TODO:
 #The paynter class is the object that draw stuff on a layer using a brush and a color
 class Paynter:
 	"""
-    This class is the main object of the library and the one that will draw everything you ask.
+	This class is the main object of the library and the one that will draw everything you ask.
 	To create this class you can use the default constructor.
-       
-    .. code-block:: python
+	   
+	.. code-block:: python
 
-    	from paynter import *
-    	P = Paynter()
+		from paynter import *
+		P = Paynter()
 	
-    """
+	"""
 	brush = 0
 	layer = 0
 	color = Color(0, 0, 0, 1)
