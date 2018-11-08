@@ -1,3 +1,11 @@
+"""
+The second most important module of the PaYnter project.
+This module will manage all the data relative to the brushes you will create and use inside your scripts.
+
+The :py:class:`Brush` is a quite complex class in the insides, but luckly the Paynter manages all the drawing.
+So the final user of the library needs only to instantiate one (or more) brush and pass it to his :py:class:`Paynter`.
+"""
+
 #External modules
 import PIL.Image
 import numpy as N
@@ -41,6 +49,15 @@ def loadBrushTip(path, size, angle):
 
 #The brush class is the one that define how the current brush should behave
 class Brush:
+	"""
+	The :py:class:`Brush` class is the one that defines how your Paynter should draw his lines.
+	To create this class you can use the default constructor.
+	   
+	.. code-block:: python
+
+		from paynter import *
+		pixelBrush = Brush( "pixel.png", "", size = 100, spacing = 1)
+	"""
 	brushTip = 0
 	brushMask = 0
 	brushSize = 0
@@ -63,6 +80,48 @@ class Brush:
 	def __init__(self, tipImage, maskImage, size = 50, angle = 0, spacing = 1, 
 				fuzzyDabAngle = 0, fuzzyDabSize = 0, fuzzyDabHue = 0, fuzzyDabSat = 0, fuzzyDabVal = 0, fuzzyDabMix = 0,
 				fuzzyDabScatter = 0, usesSourceCaching = False):
+		"""
+		The creation of a :py:class:`Brush` can be as simple as the example above or pretty complex.
+		The complexity is based on what effect you want to obtain from your Brush.
+		There are a lot of parameters that you can define to customize your Brush the way you want to be.
+
+		This is an example of a complex brush that emulates a watercolour brush:
+
+		.. code-block:: python
+		
+			watercolor = Brush(["watercolor1.png","watercolor2.png","watercolor3.png","watercolor4.png","watercolor5.png"], # Use more than a single brush tip image to create more randomization
+						"",				# No texture for this brush
+						size = 440,			# Quite big brush
+						angle = 0,			# No angle since we randomize it later each dab
+						spacing = 0.5,			# Spacing to half the size of the brush
+						fuzzyDabAngle = [0, 360],	# Randomize angle each dab
+						fuzzyDabSize = [1, 2],		# Randomize the size of each dab between original size and double the size
+						fuzzyDabHue = [-0.03, 0.03],	# Randomize slightly the hue of each dab
+						fuzzyDabSat = [-0.2, 0.2],	# Randomize slightly the saturation of each dab
+						fuzzyDabVal = [-0.1, 0.1],	# Randomize slightly the value of each dab
+						fuzzyDabMix = [0.4, 0.5],	# Randomize slightly the mix of each dab
+						fuzzyDabScatter = [0, 100])	# Make each dab go a bit of the trail to create more randomization
+
+
+		:param tipImage: A string with the path of the image that you want to use as a tip. 
+		                 If you want to load multiple brush tips and randomize between them each dab, you can place a list of strings instead.
+		:param maskImage: A string with the path of the image that you want to use as a texture to apply to your brush.
+		:param size: An integer with the size in pixel of the brush.
+		:param angle: An integer with the angle (degrees) of the brush.
+		:param spacing: A float with the spacing of the brush. Spacing is tells the system how far apart are each brush dab is. 
+		                The value of this parameter is proportional to the brush size.
+		:param fuzzyDabAngle: A list of two integers with the range between randomize the brush angle (degrees) of each dab. 
+		:param fuzzyDabSize: A list of two numbers with the range between randomize the brush size (in a proportional way to the current brush size) of each dab.  
+		:param fuzzyDabHue: A list of two float with the range between randomize the hue of each dab.
+		:param fuzzyDabSat: A list of two float with the range between randomize the saturation of each dab.
+		:param fuzzyDabVal: A list of two float with the range between randomize the value of each dab.
+		:param fuzzyDabMix: A list of two float with the range between randomize the mix of each dab.
+		:param fuzzyDabScatter: A list of two numbers with the range between randomize the deviation from the actual coordinates of each dab.
+		:param usesSourceCaching: A boolean telling the system if he can cache the brush dab for much faster consecutives dab. 
+		                          Not advised when the brush has fuzzy dab parameters.
+		"""
+
+
 		#Downsample the size-related parameters
 		self.originalSize = size
 		self.realCurrentSize = size

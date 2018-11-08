@@ -1,3 +1,10 @@
+"""
+Another key class inside the Paynter library is the Image class.
+This module will take care of storing all the layers data of the current image you are creating.
+It will also manage to merge all the layer during the final rendering process.
+
+This class will normally be 100% managed through the :py:class`Paynter` class, so you should never instantiate it manually.
+"""
 #External modules
 import PIL.Image 
 import numpy as N
@@ -13,6 +20,18 @@ import time
 ######################################################################
 #The image class is a container for all the layers of the image
 class Image:
+	"""
+	The :py:class:`Image` class is structured as an array of :py:class:`Layer`.
+
+	An Image class is created when you create a :py:class:`Paynter`, so you can access this class as follows:
+
+	.. code-block:: python
+
+		from paynter import *
+		
+		paynter = Paynter()
+		image = paynter.image
+	"""
 	layers = []
 	activeLayer = 0
 
@@ -24,15 +43,31 @@ class Image:
 
 	#Return the current active layer
 	def getActiveLayer(self):
+		"""
+		Returns the currently active :py:class:`Layer`.
+		
+		:rtype: A :py:class:`Layer` object.
+		"""
 		return self.layers[self.activeLayer]
 
 	#Create a new layer and select it
 	def newLayer(self, effect=''):
+		"""
+		Creates a new :py:class:`Layer` and set that as the active.
+		
+		:param effect: A string with the blend mode for that layer that will be used when during the rendering process. The accepted values are: :code:`'soft_light','lighten','screen','dodge','addition','darken','multiply','hard_light','difference','subtract','grain_extract','grain_merge','divide','overlay'`.
+		:rtype: Nothing.
+		"""
 		self.layers.append(Layer(effect = effect))
 		self.activeLayer = len(self.layers)-1
 
 	#Duplicate the current layer
 	def duplicateActiveLayer(self):
+		"""
+		Duplicates the current active :py:class:`Layer`.
+		
+		:rtype: Nothing.
+		"""
 		activeLayer = self.layers[self.activeLayer]
 		newLayer = Layer(data=activeLayer.data, effect=activeLayer.effect)
 		self.layers.append(newLayer)
@@ -40,6 +75,11 @@ class Image:
 
 	#Merge all the layers together to render the final image
 	def mergeAllLayers(self):
+		"""
+		Merge all the layers together.
+
+		:rtype: The result :py:class:`Layer` object. 
+		"""
 		start = time.time()
 		while(len(self.layers)>1):
 			self.mergeBottomLayers()
