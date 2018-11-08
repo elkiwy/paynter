@@ -14,7 +14,7 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('/Users/elkiwy/Dropbox/PaYnt'))
+#sys.path.insert(0, os.path.abspath('/Users/elkiwy/Dropbox/PaYnt'))
 #sys.path.insert(0, os.path.abspath('/Users/stefanobertoli/Personal/Dropbox/PaYnt'))
 
 
