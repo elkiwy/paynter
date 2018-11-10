@@ -2,6 +2,7 @@
 
 PaYnter is a Python module that let you procedurally generate images with handy features that emulates what you can find in any image editing software like Photoshop, GIMP, Krita, etc...
 
+[![Documentation Status](https://readthedocs.org/projects/paynter/badge/?version=latest)](https://paynter.readthedocs.io/en/latest/?badge=latest)
 
 
 # Features
