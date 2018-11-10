@@ -3,6 +3,7 @@
 PaYnter is a Python module that let you procedurally generate images with handy features that emulates what you can find in any image editing software like Photoshop, GIMP, Krita, etc...
 
 
+
 # Features
 
 This is a list with what there is currently inside the code:
@@ -38,9 +39,25 @@ This is a list with what there is currently inside the code:
 	
 
 
-# How to use it
+# Installation
 
-Right now there isn't much you can do with PaYnter since is really early in the development, but you can try it by cloning the repository and playing around inside example.py, while paynter.py do all the heavy works behind the scenes.
+The recommended way to use Paynter is to download it with pip with the command:
+	
+    pip3 install paynter
+
+but it can also download the source from GitHub and copy the "paynter" folder inside your project directory.
+
+If you installed it from pip make sure to have all the library requirements by running:
+
+    pip3 install -r requirements.txt
+
+
+# Usage and Documentation
+
+If you want a brief demostration you can check [example.py](https://github.com/elkiwy/paynter/blob/master/example.py) (NB: To be able to use the brushes created by example.py you also need to download the "res" folder where all the used brushtips are stored).
+
+For advanced instructions and details you can check the project documentation at [paynter.readthedocs.org](https://paynter.readthedocs.org/)
+
 
 
 # Dependencies
@@ -48,9 +65,12 @@ Right now there isn't much you can do with PaYnter since is really early in the 
 PaYnter needs **Numpy**, **Numba**, and **PIL** modules. Those can all be installed easily with Pip, anything else should come with the python3 bundle.
 
 
+
 # Scope 
 
-This project started October 1th 2018 and aims at adding all the image editing software features to be able to create images like these (made with Krita by another my Python script):
+This project started October 1th 2018 and its goal is to have a simple yet really powerful interface for all the people who wants to procedurally generate images without letting down all the features that you have inside a real image painting software.
+
+Here are some example of what I was able to create with Paynter:
 
 <img src="https://instagram.fmxp1-1.fna.fbcdn.net/vp/f905c89e7aac3190aabf83eb24c4ece7/5C50D69F/t51.2885-15/e35/s1080x1080/42178085_1903017686660541_5530345369065186468_n.jpg" width="480">
 
