@@ -1,4 +1,4 @@
 llvmlite==0.25.0
 numba==0.40.1
 numpy==1.15.4
-Pillow==8.1.1
+Pillow==9.0.1
